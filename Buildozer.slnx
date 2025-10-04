@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Buildozer/Buildozer.csproj" />
+  <Project Path="CLI/CLI.csproj" Id="1f1fd708-9a0c-4324-b993-b30637a6040e" />
+</Solution>
