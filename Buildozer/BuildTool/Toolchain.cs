@@ -1,8 +1,9 @@
 ﻿using System.Diagnostics;
-using Microsoft.VisualStudio.Setup.Configuration;
 using Microsoft.Win32;
-using System.Runtime.InteropServices;
+using Microsoft.VisualStudio.Setup.Configuration;
 using System.Runtime.Versioning;
+using System.Runtime.InteropServices;
+
 
 namespace Buildozer.BuildTool;
 
@@ -52,20 +53,22 @@ public class Toolchain
         {
             return DiscoverWindowsToolchains();
         }
-        else if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
             return DiscoverUnixToolchains();
         }
-        throw new PlatformNotSupportedException("Current host platform isn't suppored");
+        throw new PlatformNotSupportedException("Current host platform isn't supported");
     }
-
+    
     [SupportedOSPlatform("windows")]
     private static Toolchain[] DiscoverWindowsToolchains()
     {
+        List<Toolchain> toolchains = new List<Toolchain>();
+        Architecture hostArch =  RuntimeInformation.OSArchitecture;
+        
+        
         Version sdkVersion = new();
         string sdkInstallPath = "";
-        List<Toolchain> toolchains = new List<Toolchain>();
-        
         try
         {
             using (RegistryKey? key = Registry.LocalMachine.OpenSubKey("SOFTWARE\\WOW6432Node\\Microsoft\\Microsoft SDKs\\Windows\\v10.0"))
@@ -158,46 +161,42 @@ public class Toolchain
         {
             Console.Error.WriteLine($"Error 0x{ex.HResult:x8}: {ex.Message}");
         }
-
+        
         return toolchains.ToArray();
     }
-
-    private static void RunCommand(string executable, string command, out string output, out string error, out int exitCode)
+    
+    private static Version ParseClangVersion(string stdout)
     {
-        var process = new Process();
-        process.StartInfo.FileName = executable;
-        process.StartInfo.Arguments = $"""-c "{command}" """;
-        //process.StartInfo.Arguments = "-c \"xcode-select --print-path\"";
-        //process.StartInfo.Arguments = $"""-c "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -dM -E -xc /dev/null | grep -e __clang_major__ -e __clang_minor__ -e __clang_patchlevel__" """;
-        process.StartInfo.UseShellExecute = false;
-        process.StartInfo.RedirectStandardOutput = true;
-        process.StartInfo.RedirectStandardError = true;
-        process.StartInfo.CreateNoWindow = true;
-        
-        process.Start();
-        output = process.StandardOutput.ReadToEnd();
-        error = process.StandardError.ReadToEnd();
-        process.WaitForExit();
-        exitCode = process.ExitCode;
+        string[][] lines = stdout
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .ToArray();
+        return new Version(int.Parse(lines[0][^1]), int.Parse(lines[1][^1]), int.Parse(lines[2][^1]));
     }
     
     private static Toolchain[] DiscoverUnixToolchains()
     {
         List<Toolchain> toolchains = new();
-
+        Architecture hostArch =  RuntimeInformation.OSArchitecture;
+        
         if (OperatingSystem.IsMacOS())
         {
-            string error;
-            int exitCode;
-            RunCommand("zsh", "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -dM -E -xc /dev/null | grep -e __clang_major__ -e __clang_minor__ -e __clang_patchlevel__", out string stdout, out error, out exitCode);
-            string[][] lines = stdout
+            Utils.RunCommand("zsh", "xcodebuild -version", out string xcodeVerStdout, out string _, out int exitCode);
+            if (exitCode == 127)
+            {
+                Console.WriteLine("Failed to run command xcodebuild. Make sure that Xcode 16.3 or newer is installed");
+                return [];
+            }
+            
+            Version xcodeVer = new Version(xcodeVerStdout
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                .ToArray();
-            Version clangVer = new Version(int.Parse(lines[0][^1]), int.Parse(lines[1][^1]), int.Parse(lines[2][^1]));
-            
-            RunCommand("zsh", "xcrun --sdk iphoneos --show-sdk-path", out string iphonesdkPath, out error, out exitCode);
-            Console.WriteLine(iphonesdkPath);
+                .ToArray()[0][1]);
+            if (xcodeVer < new Version(16, 3))
+            {
+                Console.WriteLine("Found unsupported Xcode version. You need Xcode 16.3 or newer to use this program");
+                return [];
+            }
         }
         return toolchains.ToArray();
     }

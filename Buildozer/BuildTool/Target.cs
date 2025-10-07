@@ -35,8 +35,8 @@ public enum TargetLanguage
 {
     C,
     Cxx,
-    Csharp,
-    CsharpAOT
+    CSharp,
+    CSharpAOT
 }
 
 public class Target
