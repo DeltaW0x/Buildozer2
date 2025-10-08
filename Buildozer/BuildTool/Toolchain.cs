@@ -1,12 +1,9 @@
-﻿using System.Diagnostics;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using Microsoft.VisualStudio.Setup.Configuration;
 using System.Runtime.Versioning;
 using System.Runtime.InteropServices;
 
-
 namespace Buildozer.BuildTool;
-
 public class Toolchain
 {
     public string Name { get; protected set; }
@@ -27,9 +24,9 @@ public class Toolchain
     public List<string> GlobalDefines { get; protected set; } = new();
     public List<string> GlobalCDefines { get; protected set; } = new();
     public List<string> GlobalCxxDefines { get; protected set; } = new();
-    
+
     public List<string> SystemIncludeDirs { get; protected set; } = new();
-    
+
     public string CompilerName { get; protected set; }
     public List<string> GlobalCompilerOptions { get; protected set; } = new();
 
@@ -53,22 +50,29 @@ public class Toolchain
         {
             return DiscoverWindowsToolchains();
         }
-        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+
+        if (OperatingSystem.IsLinux())
         {
-            return DiscoverUnixToolchains();
+            return DiscoverLinuxToolchains();
         }
-        throw new PlatformNotSupportedException("Current host platform isn't supported");
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return DiscoverMacOSToolchains();
+        }
+
+        Console.WriteLine("Current host platform isn't supported");
+        return [];
     }
     
     [SupportedOSPlatform("windows")]
     private static Toolchain[] DiscoverWindowsToolchains()
     {
         List<Toolchain> toolchains = new List<Toolchain>();
-        Architecture hostArch =  RuntimeInformation.OSArchitecture;
+        Architecture hostArch = RuntimeInformation.OSArchitecture;
         
-        
-        Version sdkVersion = new();
-        string sdkInstallPath = "";
+        Version? sdkVersion = null;
+        string? sdkInstallPath = null;
         try
         {
             using (RegistryKey? key = Registry.LocalMachine.OpenSubKey("SOFTWARE\\WOW6432Node\\Microsoft\\Microsoft SDKs\\Windows\\v10.0"))
@@ -89,6 +93,12 @@ public class Toolchain
                 }
             }
 
+            if (sdkVersion == null || sdkInstallPath == null)
+            {
+                Console.WriteLine("Failed to find the Windows SDK");
+                return [];
+            }
+            
             var query = (ISetupConfiguration2)(new SetupConfiguration());
             var e = query.EnumAllInstances();
 
@@ -101,7 +111,7 @@ public class Toolchain
                 {
                     var vsInstance = (ISetupInstance2)instances[0];
                     Version version = new(vsInstance.GetInstallationVersion());
-                    
+
                     if (version.Major != 17)
                         continue;
 
@@ -149,8 +159,7 @@ public class Toolchain
                         }
                     }
                 }
-            }
-            while (fetched > 0);
+            } while (fetched > 0);
         }
         catch (COMException ex)
         {
@@ -159,12 +168,12 @@ public class Toolchain
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"Error 0x{ex.HResult:x8}: {ex.Message}");
+            Console.WriteLine($"Error 0x{ex.HResult:x8}: {ex.Message}");
         }
-        
+
         return toolchains.ToArray();
     }
-    
+
     private static Version ParseClangVersion(string stdout)
     {
         string[][] lines = stdout
@@ -174,30 +183,70 @@ public class Toolchain
         return new Version(int.Parse(lines[0][^1]), int.Parse(lines[1][^1]), int.Parse(lines[2][^1]));
     }
     
-    private static Toolchain[] DiscoverUnixToolchains()
+    [SupportedOSPlatform("macos")]
+    private static Toolchain[] DiscoverMacOSToolchains()
+    {
+        List<Toolchain> toolchains = new List<Toolchain>();
+        Architecture hostArch = RuntimeInformation.OSArchitecture;
+        
+        Utils.RunCommand("sh", "xcodebuild -version", out string xcodeVerStdout, out string _, out int exitCode);
+        if (exitCode == 127)
+        {
+            Console.WriteLine("Failed to run command xcodebuild. Make sure that Xcode 16.3 or newer is installed");
+            return [];
+        }
+
+        Version xcodeVer = new Version(xcodeVerStdout
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .ToArray()[0][1]);
+        if (xcodeVer < new Version(16, 3))
+        {
+            Console.WriteLine("Found unsupported Xcode version. You need Xcode 16.3 or newer to use this program");
+            return [];
+        }
+        
+        return toolchains.ToArray();
+    }
+    
+    private static Toolchain[] DiscoverLinuxToolchains()
     {
         List<Toolchain> toolchains = new();
-        Architecture hostArch =  RuntimeInformation.OSArchitecture;
         
-        if (OperatingSystem.IsMacOS())
+        Utils.RunCommand("sh", "which", out string _, out string _, out int whichCode);
+        if (whichCode == 127)
         {
-            Utils.RunCommand("zsh", "xcodebuild -version", out string xcodeVerStdout, out string _, out int exitCode);
-            if (exitCode == 127)
-            {
-                Console.WriteLine("Failed to run command xcodebuild. Make sure that Xcode 16.3 or newer is installed");
-                return [];
-            }
-            
-            Version xcodeVer = new Version(xcodeVerStdout
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                .ToArray()[0][1]);
-            if (xcodeVer < new Version(16, 3))
-            {
-                Console.WriteLine("Found unsupported Xcode version. You need Xcode 16.3 or newer to use this program");
-                return [];
-            }
+            Console.WriteLine("Failed to find which. Please install the 'which' command line utility to use this program");
+            return [];
         }
+        
+        Utils.RunCommand("sh", "grep", out string _, out string _, out int grepCode);
+        if (grepCode == 127)
+        {
+            Console.WriteLine("Failed to find grep. Please install the 'grep' command line utility to use this program");
+            return [];
+        }
+        
+        Utils.RunCommand("sh", "which clang", out string clangPath, out string _, out int clangCode);
+        if (clangCode != 0)
+        {
+            Console.WriteLine("Clang compiler not found, please install Clang 20.0.0+");
+            return [];
+        }
+        clangPath = clangPath.Trim();
+        
+        Utils.RunCommand("sh", 
+            $"{clangPath} -dM -E - < /dev/null | grep -E '__clang_(major|minor|patchlevel)__' | sort", 
+            out string clangVerString, 
+            out string _, 
+            out int _);
+        Version clangVer = ParseClangVersion(clangVerString);
+        if (clangVer < new Version(20, 0, 0))
+        {
+            Console.WriteLine("Found unsupported clang version. You need clang 20.0.0 or newer to use this program");
+            return [];
+        }
+        
         return toolchains.ToArray();
     }
 }
