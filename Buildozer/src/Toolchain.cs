@@ -16,8 +16,6 @@ namespace Buildozer.BuildTool
 
         public bool IsCrossCompiler { get; protected set; } = false;
 
-        public string SdkRoot { get; protected set; } = "";
-
         public Version CompilerVersion { get; protected set; } = new();
 
         public string CompilerName { get; protected set; } = "";
@@ -30,16 +28,17 @@ namespace Buildozer.BuildTool
         public string StaticLibExtension { get; protected set; } = "";
         public string ObjectFileExtension { get; protected set; } = "";
 
-        public List<string> GlobalDefines { get; protected set; } = new();
+        public List<string> Definitions { get; protected set; } = new();
 
-        public List<string> SystemIncludeDirs { get; protected set; } = new();
-        public List<string> SystemLibraryDirs { get; protected set; } = new();
+        public List<string> IncludeDirs { get; protected set; } = new();
+        public List<string> LibraryDir { get; protected set; } = new();
 
-        public List<string> GlobalCompilerOptions { get; protected set; } = new();
-        public List<string> GlobalLinkerOptions { get; protected set; } = new();
-        public List<string> GlobalLibrarianOptions { get; protected set; } = new();
-        public List<string> GlobalStripperOptions { get; protected set; } = new();
-        public List<string> GlobalLinkedLibraries { get; protected set; } = new();
+        public List<string> CompilerOptions { get; protected set; } = new();
+        public List<string> LinkerOptions { get; protected set; } = new();
+        public List<string> LibrarianOptions { get; protected set; } = new();
+        public List<string> StripperOptions { get; protected set; } = new();
+
+        public List<string> Libraries { get; protected set; } = new();
 
         public static Toolchain[] DiscoverSystemToolchains()
         {
@@ -102,53 +101,37 @@ namespace Buildozer.BuildTool
                         var vsInstance = (ISetupInstance2)instances[0];
 
                         Version vsVersion = new(vsInstance.GetInstallationVersion());
-                        if (vsVersion < BuildContext.MinimumVsVersion)
+                        if (vsVersion.Major != BuildContext.MinimumVsVersion.Major)
                             continue;
 
                         string msvcPath = Path.Join(vsInstance.GetInstallationPath(), "VC", "Tools", "MSVC");
                         if (!Directory.Exists(msvcPath))
                             continue;
 
-                        foreach (var dir in Directory.GetDirectories(msvcPath))
+                        foreach (var msvcDir in Directory.GetDirectories(msvcPath))
                         {
-                            Version msvcVer = new Version(new DirectoryInfo(dir).Name);
+                            Version msvcVer = new Version(new DirectoryInfo(msvcDir).Name);
                             if (msvcVer < BuildContext.MinimumMsvcVersion)
                                 continue;
 
-                            string x64_x64 = Path.Join(dir, "bin", "Hostx64", "x64");   // X64 -> X64 Compiler
-                            string x64_arm64 = Path.Join(dir, "bin", "Hostx64", "arm64");   // X64 -> Arm64 CrossCompiler
-
-                            string arm64_arm64 = Path.Join(dir, "bin", "Hostarm64", "arm64");   // Arm64 -> Arm64 Compiler
-                            string arm64_x64 = Path.Join(dir, "bin", "Hostarm64", "x64");   // Arm64 -> X64 CrossCompiler
-
-                            if (Directory.Exists(x64_x64))
+                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "x64")))
                             {
-                                var toolchain = new MsvcToolchain("MSVC x64", x64_x64, msvcVer, vsVersion);
-                                toolchain.IsCrossCompiler = false;
-                                toolchain.ToolchainArchitecture = BuildArchitecture.X64;
+                                var toolchain = new MsvcToolchain("Windows x64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.X64, false);
                                 toolchains.Add(toolchain);
                             }
-                            if (Directory.Exists(x64_arm64))
+                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "arm64")))
                             {
-                                var toolchain = new MsvcToolchain("MSVC arm64 (CrossCompiler)", x64_arm64, msvcVer, vsVersion);
-                                toolchain.IsCrossCompiler = true;
-                                toolchain.ToolchainArchitecture = BuildArchitecture.Arm64;
-                                
+                                var toolchain = new MsvcToolchain("Windows arm64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.Arm64, true);
                                 toolchains.Add(toolchain);
                             }
-
-                            if (Directory.Exists(arm64_arm64))
+                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "arm64")))
                             {
-                                var toolchain = new MsvcToolchain("MSVC arm64", arm64_arm64, msvcVer, vsVersion);
-                                toolchain.IsCrossCompiler = false;
-                                toolchain.ToolchainArchitecture = BuildArchitecture.Arm64;
+                                var toolchain = new MsvcToolchain("Windows arm64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.Arm64, false);
                                 toolchains.Add(toolchain);
                             }
-                            if (Directory.Exists(arm64_x64))
+                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "x64")))
                             {
-                                var toolchain = new MsvcToolchain("MSVC x64 (CrossCompiler)", arm64_x64, msvcVer, vsVersion);
-                                toolchain.IsCrossCompiler = true;
-                                toolchain.ToolchainArchitecture = BuildArchitecture.X64;
+                                var toolchain = new MsvcToolchain("Windows x64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.X64, true);
                                 toolchains.Add(toolchain);
                             }
                         }

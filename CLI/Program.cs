@@ -13,7 +13,19 @@ class Program
         {
             if(toolchain is MsvcToolchain)
             {
-                Console.WriteLine($"Name: {toolchain.Name}, MSVC Version {toolchain.CompilerVersion}, Visual Studio version: {((MsvcToolchain)toolchain).VsVersion}");
+                var msvcToolchain = toolchain as MsvcToolchain;
+
+                Console.WriteLine($"Name: {msvcToolchain!.Name}");
+                Console.WriteLine($"Windows SDK path: {msvcToolchain!.WinSdkRoot}");
+                Console.WriteLine($"Windows SDK version: {msvcToolchain!.WinSdkVersion}");
+                
+                Console.WriteLine($"Visual studio version: {msvcToolchain!.VsVersion}");
+
+                Console.WriteLine($"MSVC path: {msvcToolchain.MsvcRoot}");
+                Console.WriteLine($"MSVC version: {msvcToolchain.CompilerVersion}");
+                
+                Console.WriteLine($"Crosscompiler: {msvcToolchain.IsCrossCompiler}");
+
                 Console.WriteLine();
             }
         }

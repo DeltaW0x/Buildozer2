@@ -5,14 +5,23 @@ namespace Buildozer.BuildTool;
 public class MsvcToolchain : Toolchain
 {
     public Version VsVersion { get; private set; } = new();
+    public Version WinSdkVersion { get; private set; } = new();
+    public string WinSdkRoot { get; private set; } 
+    public string MsvcRoot { get; private set; }
 
-    public MsvcToolchain(string name, string binPath, Version msvcVersion, Version vsVersion)
+    public MsvcToolchain(string name, Version vsVersion, string msvcRoot, Version msvcVersion, string winSdkRoot, Version winSdkVersion, BuildArchitecture arch, bool crossCompiler)
     {
+
         Name = name;
-        SdkRoot = binPath;
         VsVersion = vsVersion;
+
+        MsvcRoot = msvcRoot;
         CompilerVersion = msvcVersion;
-        ToolchainPlatform = BuildPlatform.Windows;
+        
+        WinSdkRoot = winSdkRoot;
+        WinSdkVersion = winSdkVersion;
+
+        IsCrossCompiler = crossCompiler;
 
         CompilerName = "cl.exe";
         LinkerName = "link.exe";
@@ -22,29 +31,19 @@ public class MsvcToolchain : Toolchain
         StaticLibExtension = "lib";
         ObjectFileExtension = "obj";
 
-        GlobalDefines.Add($"WINVER=0x0A00"); // Hardcoded for now because we only support Windows 10+
-
-        GlobalLinkedLibraries.Add("shell32.lib");
-        GlobalLinkedLibraries.Add("oleaut32.lib");
-        GlobalLinkedLibraries.Add("kernel32.lib");
-        GlobalLinkedLibraries.Add("advapi32.lib");
-        GlobalLinkedLibraries.Add("user32.lib");
-        GlobalLinkedLibraries.Add("delayimp.lib");
-        GlobalLinkedLibraries.Add("comdlg32.lib");
-        GlobalLinkedLibraries.Add("dwmapi.lib");
-        GlobalLinkedLibraries.Add("ole32.lib");
+        Definitions.Add($"WINVER=0x0A00"); // Hardcoded for now because we only support Windows 10+
 
         if (ToolchainArchitecture == BuildArchitecture.X64) 
         {
-            GlobalCompilerOptions.Add("/arch:AVX2");
-            GlobalDefines.Add("PLATFORM_ARCH_X64=1");
+            CompilerOptions.Add("/arch:AVX2");
+            Definitions.Add("PLATFORM_ARCH_X64=1");
         }
         else if(ToolchainArchitecture == BuildArchitecture.Arm64)
         {
-            GlobalDefines.Add("USE_SOFT_INTRINSICS");
-            GlobalLinkedLibraries.Add("softintrin.lib");
+            Definitions.Add("USE_SOFT_INTRINSICS");
+            Libraries.Add("softintrin.lib");
 
-            GlobalDefines.Add("PLATFORM_ARCH_ARM64=1");
+            Definitions.Add("PLATFORM_ARCH_ARM64=1");
         }
     }
 }
