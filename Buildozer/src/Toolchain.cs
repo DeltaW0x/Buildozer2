@@ -49,11 +49,13 @@ namespace Buildozer.BuildTool
             }
             if (OperatingSystem.IsLinux())
             {
-                return DiscoverLinuxToolchains();
+                throw new NotImplementedException("Linux toolchain discovery not implemented yet");
+                //return DiscoverLinuxToolchains();
             }
             if (OperatingSystem.IsMacOS())
             {
-                return DiscoverMacOSToolchains();
+                throw new NotImplementedException("Linux toolchain discovery not implemented yet");
+                //return DiscoverMacOSToolchains();
             }
             throw new PlatformNotSupportedException("Current host platform isn't supported");
         }
@@ -117,27 +119,14 @@ namespace Buildozer.BuildTool
 
                             if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "x64")) && RuntimeInformation.OSArchitecture == Architecture.X64)
                             {
-                                var toolchain = new MsvcToolchain("Windows x64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.X64, false);
-                                toolchains.Add(toolchain);
+                                //var toolchain = new MsvcToolchain("Windows x64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.X64, false);
+                                //toolchains.Add(toolchain);
                             }
                             if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "arm64")) && RuntimeInformation.OSArchitecture == Architecture.Arm64)
                             {
-                                var toolchain = new MsvcToolchain("Windows arm64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.Arm64, false);
-                                toolchains.Add(toolchain);
+                                //var toolchain = new MsvcToolchain("Windows arm64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.Arm64, false);
+                                //toolchains.Add(toolchain);
                             }
-                            
-                            /*
-                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "arm64")))
-                            {
-                                var toolchain = new MsvcToolchain("Windows arm64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.Arm64, true);
-                                toolchains.Add(toolchain);
-                            }
-                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "x64")))
-                            {
-                                var toolchain = new MsvcToolchain("Windows x64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.X64, true);
-                                toolchains.Add(toolchain);
-                            }
-                            */
                         }
                     }
                 }
@@ -190,7 +179,7 @@ namespace Buildozer.BuildTool
                 Console.WriteLine($"Failed to find a suitable Clang installation version (found {clangVer}), please install Clang 20.0.0+ before using this software");
                 return [];
             }
-            
+            /*
             toolchains.Add(new ClangToolchain(
                 RuntimeInformation.OSArchitecture == Architecture.X64 ? "Clang x64" : "Clang arm64", 
                 clangPath, 
@@ -198,7 +187,7 @@ namespace Buildozer.BuildTool
                 BuildPlatform.Linux, 
                 RuntimeInformation.OSArchitecture.ToArch(), 
                 false));
-            
+            */
             return toolchains.ToArray();
         }
 
