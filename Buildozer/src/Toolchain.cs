@@ -15,7 +15,8 @@ namespace Buildozer.BuildTool
         public BuildArchitecture ToolchainArchitecture { get; protected set; }
 
         public bool IsCrossCompiler { get; protected set; } = false;
-
+        
+        public string CompilerRoot { get; protected set; } = "";
         public Version CompilerVersion { get; protected set; } = new();
 
         public string CompilerName { get; protected set; } = "";
@@ -114,19 +115,21 @@ namespace Buildozer.BuildTool
                             if (msvcVer < BuildContext.MinimumMsvcVersion)
                                 continue;
 
-                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "x64")))
+                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "x64")) && RuntimeInformation.OSArchitecture == Architecture.X64)
                             {
                                 var toolchain = new MsvcToolchain("Windows x64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.X64, false);
                                 toolchains.Add(toolchain);
                             }
+                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "arm64")) && RuntimeInformation.OSArchitecture == Architecture.Arm64)
+                            {
+                                var toolchain = new MsvcToolchain("Windows arm64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.Arm64, false);
+                                toolchains.Add(toolchain);
+                            }
+                            
+                            /*
                             if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "arm64")))
                             {
                                 var toolchain = new MsvcToolchain("Windows arm64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.Arm64, true);
-                                toolchains.Add(toolchain);
-                            }
-                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "arm64")))
-                            {
-                                var toolchain = new MsvcToolchain("Windows arm64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.Arm64, false);
                                 toolchains.Add(toolchain);
                             }
                             if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "x64")))
@@ -134,6 +137,7 @@ namespace Buildozer.BuildTool
                                 var toolchain = new MsvcToolchain("Windows x64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.X64, true);
                                 toolchains.Add(toolchain);
                             }
+                            */
                         }
                     }
                 }
@@ -141,7 +145,7 @@ namespace Buildozer.BuildTool
             }
             catch (COMException ex)
             {
-                Console.WriteLine("The query API is not registered. Assuming no Visual Studio instances are installed.");
+                Console.WriteLine("The Visual Studio Setup Configuration API is not registered. Assuming no Visual Studio instances are installed, please do install one.");
                 return [];
             }
             catch (Exception ex)
@@ -155,7 +159,47 @@ namespace Buildozer.BuildTool
         [SupportedOSPlatform("linux")]
         private static Toolchain[] DiscoverLinuxToolchains()
         {
-            return [];
+            List<Toolchain> toolchains = new List<Toolchain>();
+
+            Utils.CommandReturn cmdReturn = Utils.RunCommand("sh", "which");
+            if (cmdReturn.ExitCode == 127)
+            {
+                Console.WriteLine("Failed to find the 'which' command line utility, please install it before using this software");
+                return [];
+            }
+            
+            cmdReturn = Utils.RunCommand("sh", "grep");
+            if (cmdReturn.ExitCode == 127)
+            {
+                Console.WriteLine("Failed to find the 'grep' command line utility, please install it before using this software");
+                return [];
+            }
+            
+            cmdReturn = Utils.RunCommand("sh", "which clang");
+            if (cmdReturn.ExitCode == 1)
+            {
+                Console.WriteLine("Failed to find the Clang compiler suite, please install Clang 20.0.0+ before using this software");
+                return [];
+            }
+            string clangPath = cmdReturn.Stdout.Trim();
+            
+            cmdReturn = Utils.RunCommand("sh", $"{clangPath} -dM -E - < /dev/null | grep -E '__clang_(major|minor|patchlevel)__' | sort");
+            Version clangVer = Utils.ParseClangVersionStdout(cmdReturn.Stdout);
+            if (clangVer <  BuildContext.MinimumClangVersion)
+            {
+                Console.WriteLine($"Failed to find a suitable Clang installation version (found {clangVer}), please install Clang 20.0.0+ before using this software");
+                return [];
+            }
+            
+            toolchains.Add(new ClangToolchain(
+                RuntimeInformation.OSArchitecture == Architecture.X64 ? "Clang x64" : "Clang arm64", 
+                clangPath, 
+                clangVer,
+                BuildPlatform.Linux, 
+                RuntimeInformation.OSArchitecture.ToArch(), 
+                false));
+            
+            return toolchains.ToArray();
         }
 
         [SupportedOSPlatform("macos")]

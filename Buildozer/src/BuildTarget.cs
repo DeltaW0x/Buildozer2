@@ -2,6 +2,13 @@
 
 namespace Buildozer.BuildTool;
 
+public enum BuildLanguage
+{
+    C11,
+    Cxx20,
+    NetCore9,
+    NetCore9Aot
+}
 public enum BuildPlatform
 {
     Linux,
@@ -30,11 +37,11 @@ public static class BuildExtensions
         {
             return BuildPlatform.Windows;
         }
-        else if (platform == OSPlatform.Linux)
+        if (platform == OSPlatform.Linux)
         {
             return BuildPlatform.Linux;
         }
-        else if(platform == OSPlatform.OSX)
+        if(platform == OSPlatform.OSX)
         {
             return BuildPlatform.MacOS;
         }

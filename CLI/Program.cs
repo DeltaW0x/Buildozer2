@@ -21,10 +21,24 @@ class Program
                 
                 Console.WriteLine($"Visual studio version: {msvcToolchain!.VsVersion}");
 
-                Console.WriteLine($"MSVC path: {msvcToolchain.MsvcRoot}");
+                Console.WriteLine($"MSVC path: {msvcToolchain.CompilerRoot}");
                 Console.WriteLine($"MSVC version: {msvcToolchain.CompilerVersion}");
                 
                 Console.WriteLine($"Crosscompiler: {msvcToolchain.IsCrossCompiler}");
+
+                Console.WriteLine();
+            }
+            
+            else if(toolchain is ClangToolchain)
+            {
+                var clangToolchain = toolchain as ClangToolchain;
+
+                Console.WriteLine($"Name: {clangToolchain!.Name}");
+
+                Console.WriteLine($"Clang path: {clangToolchain.CompilerRoot}");
+                Console.WriteLine($"Clang version: {clangToolchain.CompilerVersion}");
+                
+                Console.WriteLine($"Crosscompiler: {clangToolchain.IsCrossCompiler}");
 
                 Console.WriteLine();
             }
