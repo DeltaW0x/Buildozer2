@@ -4,7 +4,7 @@ using Microsoft.VisualStudio.Setup.Configuration;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 
-namespace Buildozer.BuildTool
+namespace Buildozer.src.BuildTool
 {
     public class Toolchain
     {

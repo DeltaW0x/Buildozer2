@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace Buildozer.BuildTool;
+namespace Buildozer.src.BuildTool;
 
 public enum BuildLanguage
 {

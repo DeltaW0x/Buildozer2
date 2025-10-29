@@ -1,4 +1,4 @@
-﻿namespace Buildozer.BuildTool;
+﻿namespace Buildozer.src.BuildTool;
 
 public static class BuildContext
 {

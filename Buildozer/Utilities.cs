@@ -37,4 +37,42 @@ public static class Utils
         
         return new CommandReturn{Stdout = output, Stderr = error, ExitCode = exitCode};
     }
+
+    private static async Task DownloadFileAsync(string url, string targetDir)
+    {
+        using (var client = new HttpClient())
+        {
+            var downloadStream = await client.GetStreamAsync(new Uri(url));
+            var downloadFile = new FileStream(targetDir, FileMode.Create, FileAccess.Write);
+
+            await downloadStream.CopyToAsync(downloadFile);
+            await downloadFile.FlushAsync();
+            downloadFile.Close();
+        }
+    }
+
+    private static void RunGitClone(string repoUrl, string targetDir, bool recursive = true, string repoName = "repo")
+    {
+        string arguments = recursive ? "clone --progress --recursive" : "clone --progress";
+        using var process = new Process
+        {
+            StartInfo =
+                new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = $"{arguments} {repoUrl} {targetDir}",
+                    RedirectStandardError = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+        };
+        process.OutputDataReceived += (sender, args) => Console.WriteLine(args.Data);
+        process.ErrorDataReceived += new DataReceivedEventHandler((sender, args) => { Console.WriteLine(args.Data); });
+
+        process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        process.WaitForExit();
+    }
 }
