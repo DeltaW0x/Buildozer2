@@ -4,10 +4,9 @@ namespace Buildozer.CLI;
 
 partial class Program
 {
-    static async Task Main()
+    static void Main()
     {
-        Console.WriteLine("Hello World");
-        await Task.CompletedTask;
+        Console.WriteLine($"Does explorer exist? {Utils.CheckProgram("explorer", out string? path)} { path ?? "" }");
     }
 }
 

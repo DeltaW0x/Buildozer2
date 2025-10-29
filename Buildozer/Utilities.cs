@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 namespace Buildozer;
 
 public static class Utils
@@ -23,7 +24,7 @@ public static class Utils
     {
         var process = new Process();
         process.StartInfo.FileName = shell;
-        process.StartInfo.Arguments = OperatingSystem.IsWindows() ? $"{command}" : $"""-c "{command}" """;
+        process.StartInfo.Arguments = OperatingSystem.IsWindows() ? $"/c {command}" : $"""-c "{command}" """;
         process.StartInfo.CreateNoWindow = true;
         process.StartInfo.UseShellExecute = false;
         process.StartInfo.RedirectStandardOutput = true;
@@ -36,6 +37,24 @@ public static class Utils
         int exitCode = process.ExitCode;
         
         return new CommandReturn{Stdout = output, Stderr = error, ExitCode = exitCode};
+    }
+
+    public static bool CheckProgram(string programName, out string? path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            CommandReturn ret = RunCommand("cmd", $"where {programName}");
+            path = ret.ExitCode == 0 ? ret.Stdout.Split('\n')[0].Trim() : null;
+            return ret.ExitCode == 0;
+        }
+        else if(OperatingSystem.IsMacOS() || OperatingSystem.IsLinux())
+        {
+            CommandReturn ret = RunCommand("sh", $"which {programName}");
+            path = ret.ExitCode != 127 ? ret.Stdout.Split('\n')[0].Trim() : null;
+            return ret.ExitCode != 127;
+        }
+
+        throw new PlatformNotSupportedException("Current operating system not supported");
     }
 
     private static async Task DownloadFileAsync(string url, string targetDir)
