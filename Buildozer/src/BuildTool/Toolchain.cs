@@ -1,18 +1,18 @@
-﻿using Microsoft.Win32;
+﻿using Serilog;
+using System.Runtime.Versioning;
+using System.Runtime.InteropServices;
+using Microsoft.Win32;
 using Microsoft.VisualStudio.Setup.Configuration;
 
-using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
-
-namespace Buildozer.src.BuildTool
+namespace Buildozer.BuildTool
 {
     public class Toolchain
     {
         public string Name { get; protected set; } = "";
         public string Description { get; protected set; } = "";
 
-        public BuildPlatform ToolchainPlatform { get; protected set; }
-        public BuildArchitecture ToolchainArchitecture { get; protected set; }
+        public OSPlatform ToolchainPlatform { get; protected set; }
+        public Architecture ToolchainArchitecture { get; protected set; }
 
         public bool IsCrossCompiler { get; protected set; } = false;
         
@@ -67,7 +67,7 @@ namespace Buildozer.src.BuildTool
 
             string? winSdkPath = null;
             Version? winSdkVersion = null;
-
+            
             try
             {
                 using (RegistryKey? key = Registry.LocalMachine.OpenSubKey("SOFTWARE\\WOW6432Node\\Microsoft\\Microsoft SDKs\\Windows\\v10.0"))
@@ -88,8 +88,16 @@ namespace Buildozer.src.BuildTool
                     }
                 }
 
-                _ = winSdkPath ?? throw new Exception("Failed to query thw Windows SDK path");
-                _ = winSdkVersion ?? throw new Exception("Failed to query the Windows SDK version");
+                if (winSdkPath == null)
+                {
+                    Log.Error("Failed to find a suitable Windows SDK installation. Please install the Windows SDK and try again");
+                    return [];
+                }
+                if (winSdkVersion == null || winSdkVersion < BuildContext.MiniumWinSdkVersion)
+                {
+                    Log.Error("Failed to find a suitable Windows SDK version. Please install the Windows SDK and try again");
+                    return [];
+                }
 
                 var vsQuery = (ISetupConfiguration2)(new SetupConfiguration());
                 var e = vsQuery.EnumAllInstances();
@@ -108,25 +116,41 @@ namespace Buildozer.src.BuildTool
                             continue;
 
                         string msvcPath = Path.Join(vsInstance.GetInstallationPath(), "VC", "Tools", "MSVC");
-                        if (!Directory.Exists(msvcPath))
-                            continue;
+                        string clangPath = Path.Join(vsInstance.GetInstallationPath(), "VC", "Tools", "Llvm");
 
-                        foreach (var msvcDir in Directory.GetDirectories(msvcPath))
+                        if (Directory.Exists(msvcPath))
                         {
-                            Version msvcVer = new Version(new DirectoryInfo(msvcDir).Name);
-                            if (msvcVer < BuildContext.MinimumMsvcVersion)
-                                continue;
+                            foreach (var msvcDir in Directory.GetDirectories(msvcPath))
+                            {
+                                Version msvcVer = new Version(new DirectoryInfo(msvcDir).Name);
+                                if (msvcVer < BuildContext.MinimumMsvcVersion)
+                                    continue;
+                                
+                                if(RuntimeInformation.OSArchitecture == Architecture.X64)
+                                {
+                                    if (!Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "x64")))
+                                        continue;
 
-                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "x64")) && RuntimeInformation.OSArchitecture == Architecture.X64)
-                            {
-                                //var toolchain = new MsvcToolchain("Windows x64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.X64, false);
-                                //toolchains.Add(toolchain);
+                                    if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "arm64")))
+                                    {
+
+                                    }
+                                }
+                                if (RuntimeInformation.OSArchitecture == Architecture.Arm64)
+                                {
+                                    if (!Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "arm64")))
+                                        continue;
+
+                                    if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "x64")))
+                                    {
+
+                                    }
+                                }
                             }
-                            if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "arm64")) && RuntimeInformation.OSArchitecture == Architecture.Arm64)
-                            {
-                                //var toolchain = new MsvcToolchain("Windows arm64", vsVersion, msvcDir, msvcVer, winSdkPath, winSdkVersion, BuildArchitecture.Arm64, false);
-                                //toolchains.Add(toolchain);
-                            }
+                        }
+                        if(Directory.Exists(clangPath))
+                        {
+
                         }
                     }
                 }
@@ -134,12 +158,13 @@ namespace Buildozer.src.BuildTool
             }
             catch (COMException ex)
             {
-                Console.WriteLine("The Visual Studio Setup Configuration API is not registered. Assuming no Visual Studio instances are installed, please do install one.");
+                Log.Error($"Error 0x{ex.HResult:x8}: {ex.Message}");
                 return [];
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error 0x{ex.HResult:x8}: {ex.Message}");
+                Log.Error("The Visual Studio Setup Configuration API is not registered. Assuming no Visual Studio instances are installed, please do install one.");
+                return [];
             }
 
             return toolchains.ToArray();
@@ -153,41 +178,36 @@ namespace Buildozer.src.BuildTool
             Utils.CommandReturn cmdReturn = Utils.RunCommand("sh", "which");
             if (cmdReturn.ExitCode == 127)
             {
-                Console.WriteLine("Failed to find the 'which' command line utility, please install it before using this software");
+                Log.Error("Failed to find the 'which' command line utility, please install it before using this software");
                 return [];
             }
             
-            cmdReturn = Utils.RunCommand("sh", "grep");
+            cmdReturn = Utils.RunCommand("sh", "-c \"grep\"");
             if (cmdReturn.ExitCode == 127)
             {
-                Console.WriteLine("Failed to find the 'grep' command line utility, please install it before using this software");
+                Log.Error("Failed to find the 'grep' command line utility, please install it before using this software");
                 return [];
             }
             
-            cmdReturn = Utils.RunCommand("sh", "which clang");
+            cmdReturn = Utils.RunCommand("sh", "-c \"which clang\"");
             if (cmdReturn.ExitCode == 1)
             {
-                Console.WriteLine("Failed to find the Clang compiler suite, please install Clang 20.0.0+ before using this software");
+                Log.Error("Failed to find the Clang compiler suite, please install Clang 20.0.0+ before using this software");
                 return [];
             }
+
             string clangPath = cmdReturn.Stdout.Trim();
-            
-            cmdReturn = Utils.RunCommand("sh", $"{clangPath} -dM -E - < /dev/null | grep -E '__clang_(major|minor|patchlevel)__' | sort");
+            cmdReturn = Utils.RunCommand($"{clangPath}", $"-dM -E - < /dev/null");
+            cmdReturn = Utils.RunCommand($"sh", $"-c \"grep {cmdReturn.Stdout} -E '__clang_(major|minor|patchlevel)__'\"");
+            cmdReturn = Utils.RunCommand($"sh", $"-c \"sort {cmdReturn.Stdout}\"");
+
             Version clangVer = Utils.ParseClangVersionStdout(cmdReturn.Stdout);
-            if (clangVer <  BuildContext.MinimumClangVersion)
+            if (clangVer < BuildContext.MinimumClangVersion)
             {
-                Console.WriteLine($"Failed to find a suitable Clang installation version (found {clangVer}), please install Clang 20.0.0+ before using this software");
+                Log.Error($"Failed to find a suitable Clang installation version (found {clangVer}), please install Clang 20.0.0+ before using this software");
                 return [];
             }
-            /*
-            toolchains.Add(new ClangToolchain(
-                RuntimeInformation.OSArchitecture == Architecture.X64 ? "Clang x64" : "Clang arm64", 
-                clangPath, 
-                clangVer,
-                BuildPlatform.Linux, 
-                RuntimeInformation.OSArchitecture.ToArch(), 
-                false));
-            */
+
             return toolchains.ToArray();
         }
 

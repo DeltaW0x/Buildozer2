@@ -28,11 +28,11 @@ public static class Utils
         return new Version(int.Parse(lines[0][^1]), int.Parse(lines[1][^1]), int.Parse(lines[2][^1]));
     }
 
-    public static CommandReturn RunCommand(string shell, string command)
+    public static CommandReturn RunCommand(string exe, string arguments)
     {
         Process process = new();
-        process.StartInfo.FileName = shell;
-        process.StartInfo.Arguments = OperatingSystem.IsWindows() ? $"/c {command}" : $"""-c "{command}" """;
+        process.StartInfo.FileName = exe;
+        process.StartInfo.Arguments = arguments;
         process.StartInfo.CreateNoWindow = true;
         process.StartInfo.UseShellExecute = false;
         process.StartInfo.RedirectStandardOutput = true;
@@ -42,22 +42,21 @@ public static class Utils
         string output = process.StandardOutput.ReadToEnd();
         string error = process.StandardError.ReadToEnd();
         process.WaitForExit();
-        int exitCode = process.ExitCode;
 
-        return new CommandReturn { Stdout = output, Stderr = error, ExitCode = exitCode };
+        return new CommandReturn { Stdout = output, Stderr = error, ExitCode = process.ExitCode };
     }
 
     public static bool CheckProgram(string programName, out string? path)
     {
         if (OperatingSystem.IsWindows())
         {
-            CommandReturn ret = RunCommand("cmd.exe", $"where {programName}");
+            CommandReturn ret = RunCommand("cmd.exe", $"/c \"where {programName}\"");
             path = ret.ExitCode == 0 ? ret.Stdout.Split('\n')[0].Trim() : null;
             return ret.ExitCode == 0;
         }
         else
         {
-            CommandReturn ret = RunCommand("sh", $"which {programName}");
+            CommandReturn ret = RunCommand("sh", $"-c \"which {programName}\"");
             path = ret.ExitCode != 0 ? ret.Stdout.Split('\n')[0].Trim() : null;
             return ret.ExitCode != 0;
         }
