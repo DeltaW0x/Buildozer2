@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Buildozer;
 
@@ -21,14 +22,17 @@ public static class Utils
 
     public static Version ParseClangVersionStdout(string stdout)
     {
-        string[][] lines = stdout
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        var lines = stdout.Split(new[] {'\n'}, StringSplitOptions.RemoveEmptyEntries);
+        var regex = new Regex("__clang_(major|minor|patchlevel)__");
+        
+        string[][] versionLines = lines
+            .Where(l => regex.IsMatch(l)).OrderBy(l => l)
             .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             .ToArray();
-        return new Version(int.Parse(lines[0][^1]), int.Parse(lines[1][^1]), int.Parse(lines[2][^1]));
+        return new Version(int.Parse(versionLines[0][^1]), int.Parse(versionLines[1][^1]), int.Parse(versionLines[2][^1]));
     }
-
-    public static CommandReturn RunCommand(string exe, string arguments)
+    
+    public static CommandReturn RunProcess(string exe, string arguments)
     {
         Process process = new();
         process.StartInfo.FileName = exe;
@@ -43,23 +47,24 @@ public static class Utils
         string error = process.StandardError.ReadToEnd();
         process.WaitForExit();
 
-        return new CommandReturn { Stdout = output, Stderr = error, ExitCode = process.ExitCode };
+        return new CommandReturn
+        {
+            Stdout = process.StandardOutput.ReadToEnd(), 
+            Stderr = process.StandardError.ReadToEnd(), 
+            ExitCode = process.ExitCode
+        };
     }
 
     public static bool CheckProgram(string programName, out string? path)
     {
+        CommandReturn ret;
         if (OperatingSystem.IsWindows())
-        {
-            CommandReturn ret = RunCommand("cmd.exe", $"/c \"where {programName}\"");
-            path = ret.ExitCode == 0 ? ret.Stdout.Split('\n')[0].Trim() : null;
-            return ret.ExitCode == 0;
-        }
+            ret = RunProcess("cmd.exe", $"/c \"where {programName}\"");
         else
-        {
-            CommandReturn ret = RunCommand("sh", $"-c \"which {programName}\"");
-            path = ret.ExitCode != 0 ? ret.Stdout.Split('\n')[0].Trim() : null;
-            return ret.ExitCode != 0;
-        }
+            ret = RunProcess("sh", $"-c \"which {programName}\"");
+        
+        path = ret.ExitCode == 0 ? ret.Stdout.Split('\n')[0].Trim() : null;
+        return ret.ExitCode == 0;
     }
 
     public static async Task DownloadFileAsync(string url, string targetDir)

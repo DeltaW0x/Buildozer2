@@ -12,7 +12,6 @@ partial class Program
             .CreateLogger();
 
         Toolchain[] toolchains = Toolchain.DiscoverSystemToolchains();
-        Console.WriteLine(toolchains[0].GenerateNinjaToolchain());
     }
 }
 

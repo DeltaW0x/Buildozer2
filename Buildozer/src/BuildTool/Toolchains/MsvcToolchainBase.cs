@@ -71,7 +71,7 @@ namespace Buildozer.BuildTool
             string filePath = Path.Join(Path.GetTempPath(), "check_header.cpp");
             string objPath = Path.Join(Path.GetTempPath(), "check_header.obj");
             File.WriteAllText(filePath, $"#include <{header}>\n int main(){{return 0;}}");
-            var res = Utils.RunCommand(Path.Join(BinRoot, CompilerName), $"/nologo /c /std:{BuildContext.CurrentCxxVersion} {String.Join(" ", IncludeDirs.Select(dir => $"/I\"{dir}\""))}  \"{filePath}\" /Fo\"{objPath}\"");
+            var res = Utils.RunProcess(Path.Join(BinRoot, CompilerName), $"/nologo /c /std:{BuildContext.CurrentCxxVersion} {String.Join(" ", IncludeDirs.Select(dir => $"/I\"{dir}\""))}  \"{filePath}\" /Fo\"{objPath}\"");
             return res.ExitCode == 0;
         }
 

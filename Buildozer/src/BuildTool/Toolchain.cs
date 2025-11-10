@@ -102,9 +102,10 @@ namespace Buildozer.BuildTool
         public static Toolchain[] DiscoverSystemToolchains()
         {
             if (OperatingSystem.IsWindows())
-            {
                 return DiscoverWindowsToolchains();
-            }
+            if (OperatingSystem.IsMacOS())
+                return DiscoverMacOSToolchains();
+            
             throw new PlatformNotSupportedException("Current host platform isn't supported");
         }
 
@@ -232,21 +233,21 @@ namespace Buildozer.BuildTool
         {
             List<Toolchain> toolchains = new List<Toolchain>();
 
-            Utils.CommandReturn cmdReturn = Utils.RunCommand("sh", "which");
+            Utils.CommandReturn cmdReturn = Utils.RunProcess("sh", "which");
             if (cmdReturn.ExitCode == 127)
             {
                 Log.Error("Failed to find the 'which' command line utility, please install it before using this software");
                 return [];
             }
 
-            cmdReturn = Utils.RunCommand("sh", "-c \"grep\"");
+            cmdReturn = Utils.RunProcess("sh", "-c \"grep\"");
             if (cmdReturn.ExitCode == 127)
             {
                 Log.Error("Failed to find the 'grep' command line utility, please install it before using this software");
                 return [];
             }
 
-            cmdReturn = Utils.RunCommand("sh", "-c \"which clang\"");
+            cmdReturn = Utils.RunProcess("sh", "-c \"which clang\"");
             if (cmdReturn.ExitCode == 1)
             {
                 Log.Error("Failed to find the Clang compiler suite, please install Clang 20.0.0+ before using this software");
@@ -254,9 +255,9 @@ namespace Buildozer.BuildTool
             }
 
             string clangPath = cmdReturn.Stdout.Trim();
-            cmdReturn = Utils.RunCommand($"{clangPath}", $"-dM -E - < /dev/null");
-            cmdReturn = Utils.RunCommand($"sh", $"-c \"grep {cmdReturn.Stdout} -E '__clang_(major|minor|patchlevel)__'\"");
-            cmdReturn = Utils.RunCommand($"sh", $"-c \"sort {cmdReturn.Stdout}\"");
+            cmdReturn = Utils.RunProcess($"{clangPath}", $"-dM -E - < /dev/null");
+            cmdReturn = Utils.RunProcess($"sh", $"-c \"grep {cmdReturn.Stdout} -E '__clang_(major|minor|patchlevel)__'\"");
+            cmdReturn = Utils.RunProcess($"sh", $"-c \"sort {cmdReturn.Stdout}\"");
 
             Version clangVer = Utils.ParseClangVersionStdout(cmdReturn.Stdout);
             if (clangVer < BuildContext.MinimumClangVersion)
@@ -271,7 +272,50 @@ namespace Buildozer.BuildTool
         [SupportedOSPlatform("macos")]
         private static Toolchain[] DiscoverMacOSToolchains()
         {
-            return [];
+            Utils.CommandReturn cmdReturn;
+            List<Toolchain> toolchains = new List<Toolchain>();
+
+            if (!Utils.CheckProgram("xcrun", out string? _))
+            {
+                Log.Error("Could not find the xcrun program, make sure that the Xcode command line tools are installed");
+                return [];
+            }
+
+            cmdReturn = Utils.RunProcess("sh", "-c \"xcrun clang -dM -E - < /dev/null\"");
+            if (cmdReturn.ExitCode != 0)
+            {
+                Log.Error($"Failed to query clang version: {cmdReturn.Stdout}");
+                return [];
+            }
+            Version clangVer = Utils.ParseClangVersionStdout(cmdReturn.Stdout);
+            if (clangVer < BuildContext.MinimumClangVersion)
+            {
+                Log.Error($"Failed to find a suitable Clang installation version (found {clangVer}), please install Clang {BuildContext.MinimumClangVersion}+ before using this software");
+                return [];
+            }
+            
+            if (!Utils.CheckProgram("xcodebuild", out string? xcodebuildPath))
+            {
+                Log.Error("Could not find the xcodebuild program, make sure that the Xcode is installed");
+                return [];
+            }
+            cmdReturn = Utils.RunProcess(xcodebuildPath!, "-version");
+            if (cmdReturn.ExitCode != 0)
+            {
+                Log.Error($"Failed to query xcode version: {cmdReturn.Stdout}");
+                return [];
+            }
+            Version xcodeVer = new Version(cmdReturn.Stdout
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .First()
+                    .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Last());
+            if (xcodeVer < BuildContext.MinimumXcodeVersion)
+            {
+                Log.Error($"Failed to find a suitable Xcode installation version (found {xcodeVer}), please install Xcode {BuildContext.MinimumXcodeVersion}+ before using this software");
+                return [];
+            }
+            return toolchains.ToArray();
         }
     }
 }
