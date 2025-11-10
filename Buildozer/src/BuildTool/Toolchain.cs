@@ -1,12 +1,12 @@
-﻿using Serilog;
-using System.Runtime.Versioning;
-using System.Runtime.InteropServices;
+﻿using Microsoft.VisualStudio.Setup.Configuration;
 using Microsoft.Win32;
-using Microsoft.VisualStudio.Setup.Configuration;
+using Serilog;
+using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 
 namespace Buildozer.BuildTool
 {
-    public class Toolchain
+    public abstract class Toolchain
     {
         public string Name { get; protected set; } = "";
         public string Description { get; protected set; } = "";
@@ -15,8 +15,11 @@ namespace Buildozer.BuildTool
         public Architecture ToolchainArchitecture { get; protected set; }
 
         public bool IsCrossCompiler { get; protected set; } = false;
+        public bool HasASan { get; set; } = false;
+        public bool HasImportLibs { get; protected set; } = false;
+
+        public string BinRoot { get; protected set; } = "";
         
-        public string CompilerRoot { get; protected set; } = "";
         public Version CompilerVersion { get; protected set; } = new();
 
         public string CompilerName { get; protected set; } = "";
@@ -27,35 +30,80 @@ namespace Buildozer.BuildTool
         public string LibNamePrefix { get; protected set; } = "";
         public string SharedLibExtension { get; protected set; } = "";
         public string StaticLibExtension { get; protected set; } = "";
+        public string ExecutableExtension { get; protected set; } = "";
         public string ObjectFileExtension { get; protected set; } = "";
 
-        public List<string> Definitions { get; protected set; } = new();
+        public List<string> Definitions { get; set; } = new();
+        public List<string> Libraries { get; set; } = new();
+        public List<string> Frameworks { get; set; } = new();
 
-        public List<string> IncludeDirs { get; protected set; } = new();
-        public List<string> LibraryDir { get; protected set; } = new();
+        public List<string> IncludeDirs { get; set; } = new();
+        public List<string> LibraryDirs { get; set; } = new();
 
-        public List<string> CompilerOptions { get; protected set; } = new();
-        public List<string> LinkerOptions { get; protected set; } = new();
-        public List<string> LibrarianOptions { get; protected set; } = new();
-        public List<string> StripperOptions { get; protected set; } = new();
+        public List<string> CFlags { get; set; } = new();
+        public List<string> CXXFlags { get; set; } = new();
+        public List<string> CompilerOptions { get; set; } = new();
+        public List<string> LinkerOptions { get; set; } = new();
+        public List<string> LibrarianOptions { get; set; } = new();
+        public List<string> StripperOptions { get; set; } = new();
 
-        public List<string> Libraries { get; protected set; } = new();
+        public Dictionary<BuildConfig, List<string>> BuildConfigDefinitions { get; set; } = new();
+        public Dictionary<BuildConfig, List<string>> BuildConfigLibraries { get; set; } = new();
+        public Dictionary<BuildConfig, List<string>> BuildConfigCompilerOptions { get; set; } = new();
+        public Dictionary<BuildConfig, List<string>> BuildConfigLinkerOptions { get; set; } = new();
+
+        public Dictionary<BuildConfig, List<string>> BuildConfigDeployLibraries {  get; set; } = new();
+
+        protected Toolchain(OSPlatform platform, Architecture arch)
+        {
+            ToolchainPlatform = platform;
+            ToolchainArchitecture = arch;
+
+            BuildConfigDefinitions[BuildConfig.Debug] = new();
+            BuildConfigDefinitions[BuildConfig.Develop] = new();
+            BuildConfigDefinitions[BuildConfig.Release] = new();
+
+            BuildConfigLibraries[BuildConfig.Debug] = new();
+            BuildConfigLibraries[BuildConfig.Develop] = new();
+            BuildConfigLibraries[BuildConfig.Release] = new();
+
+            BuildConfigCompilerOptions[BuildConfig.Debug] = new();
+            BuildConfigCompilerOptions[BuildConfig.Develop] = new();
+            BuildConfigCompilerOptions[BuildConfig.Release] = new();
+
+            BuildConfigLinkerOptions[BuildConfig.Debug] = new();
+            BuildConfigLinkerOptions[BuildConfig.Develop] = new();
+            BuildConfigLinkerOptions[BuildConfig.Release] = new();
+
+            BuildConfigDeployLibraries[BuildConfig.Debug] = new();
+            BuildConfigDeployLibraries[BuildConfig.Develop] = new();
+            BuildConfigDeployLibraries[BuildConfig.Release] = new();
+
+            Definitions.Add(ToolchainArchitecture == Architecture.X64 ? "STOMPER_ARCH_X64" : "STOMPER_ARCH_ARM64");
+
+            BuildConfigDefinitions[BuildConfig.Release].AddRange([
+                "NDEBUG",
+                "STOMPER_RELEASE"
+            ]);
+            BuildConfigDefinitions[BuildConfig.Develop].AddRange([
+                "DEBUG",
+                "STOMPER_DEVELOP"
+            ]);
+            BuildConfigDefinitions[BuildConfig.Debug].AddRange([
+                "DEBUG",
+                "STOMPER_DEBUG"
+            ]);
+        }
+
+        public abstract bool HasHeader(string name);
+
+        public abstract string GenerateNinjaToolchain();
 
         public static Toolchain[] DiscoverSystemToolchains()
         {
             if (OperatingSystem.IsWindows())
             {
                 return DiscoverWindowsToolchains();
-            }
-            if (OperatingSystem.IsLinux())
-            {
-                throw new NotImplementedException("Linux toolchain discovery not implemented yet");
-                //return DiscoverLinuxToolchains();
-            }
-            if (OperatingSystem.IsMacOS())
-            {
-                throw new NotImplementedException("Linux toolchain discovery not implemented yet");
-                //return DiscoverMacOSToolchains();
             }
             throw new PlatformNotSupportedException("Current host platform isn't supported");
         }
@@ -67,17 +115,18 @@ namespace Buildozer.BuildTool
 
             string? winSdkPath = null;
             Version? winSdkVersion = null;
-            
+
             try
             {
                 using (RegistryKey? key = Registry.LocalMachine.OpenSubKey("SOFTWARE\\WOW6432Node\\Microsoft\\Microsoft SDKs\\Windows\\v10.0"))
                 {
                     if (key != null)
                     {
+
                         object? version = key.GetValue("ProductVersion");
                         if (version != null)
                         {
-                            winSdkVersion = new Version(version.ToString()!);
+                            winSdkVersion = new Version(version.ToString()! + ".0");
                         }
 
                         object? installPath = key.GetValue("InstallationFolder");
@@ -116,7 +165,13 @@ namespace Buildozer.BuildTool
                             continue;
 
                         string msvcPath = Path.Join(vsInstance.GetInstallationPath(), "VC", "Tools", "MSVC");
-                        string clangPath = Path.Join(vsInstance.GetInstallationPath(), "VC", "Tools", "Llvm");
+
+                        // These are common between arm64 and x64 and msvc/clang
+                        string[] winSdkIncludeDirs = {
+                            Path.Combine(winSdkPath, "include", winSdkVersion.ToString(), "ucrt"),
+                            Path.Combine(winSdkPath, "include", winSdkVersion.ToString(), "um"),
+                            Path.Combine(winSdkPath, "include", winSdkVersion.ToString(), "shared")
+                        };
 
                         if (Directory.Exists(msvcPath))
                         {
@@ -125,32 +180,38 @@ namespace Buildozer.BuildTool
                                 Version msvcVer = new Version(new DirectoryInfo(msvcDir).Name);
                                 if (msvcVer < BuildContext.MinimumMsvcVersion)
                                     continue;
-                                
-                                if(RuntimeInformation.OSArchitecture == Architecture.X64)
+
+                                if (RuntimeInformation.OSArchitecture == Architecture.X64)
                                 {
+                                    // You need at least a host compiler
                                     if (!Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "x64")))
                                         continue;
 
-                                    if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "arm64")))
+                                    WinMsvcToolchain hostToolchain = new WinMsvcToolchain(OSPlatform.Windows, Architecture.X64, msvcVer, winSdkVersion);
+                                    hostToolchain.IsCrossCompiler = false;
+                                    hostToolchain.BinRoot = Path.Join(msvcDir, "bin", "Hostx64", "x64");
+                                    hostToolchain.IncludeDirs.Add(Path.Combine(msvcDir, "include"));
+                                    hostToolchain.IncludeDirs.AddRange(winSdkIncludeDirs);
+                                    hostToolchain.LibraryDirs.AddRange([
+                                        Path.Combine(msvcDir, "lib", "x64"),
+                                        Path.Combine(winSdkPath, "lib", winSdkVersion.ToString(), "um", "x64"),
+                                        Path.Combine(winSdkPath, "lib", winSdkVersion.ToString(), "ucrt", "x64")
+                                    ]);
+
+                                    if(File.Exists(Path.Join(msvcDir, "lib", "x64", "clang_rt.asan_dbg_dynamic-x86_64.lib")) &&
+                                       File.Exists(Path.Join(msvcDir, "lib", "x64", "clang_rt.asan_dynamic_runtime_thunk-x86_64.lib")))
                                     {
-
+                                        hostToolchain.HasASan = true;
+                                        hostToolchain.BuildConfigCompilerOptions[BuildConfig.Debug].Add("/fsanitize=address");
+                                        hostToolchain.BuildConfigLibraries[BuildConfig.Debug].AddRange([
+                                            "clang_rt.asan_dbg_dynamic-x86_64.lib",
+                                            "clang_rt.asan_dynamic_runtime_thunk-x86_64.lib"
+                                        ]);
+                                        hostToolchain.BuildConfigDeployLibraries[BuildConfig.Debug].Add("clang_rt.asan_dbg_dynamic-x86_64.dll");
                                     }
-                                }
-                                if (RuntimeInformation.OSArchitecture == Architecture.Arm64)
-                                {
-                                    if (!Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "arm64")))
-                                        continue;
-
-                                    if (Directory.Exists(Path.Join(msvcDir, "bin", "Hostarm64", "x64")))
-                                    {
-
-                                    }
+                                    toolchains.Add(hostToolchain);
                                 }
                             }
-                        }
-                        if(Directory.Exists(clangPath))
-                        {
-
                         }
                     }
                 }
@@ -158,12 +219,8 @@ namespace Buildozer.BuildTool
             }
             catch (COMException ex)
             {
-                Log.Error($"Error 0x{ex.HResult:x8}: {ex.Message}");
-                return [];
-            }
-            catch (Exception ex)
-            {
                 Log.Error("The Visual Studio Setup Configuration API is not registered. Assuming no Visual Studio instances are installed, please do install one.");
+                Log.Error($"Error 0x{ex.HResult:x8}: {ex.Message}");
                 return [];
             }
 
@@ -181,14 +238,14 @@ namespace Buildozer.BuildTool
                 Log.Error("Failed to find the 'which' command line utility, please install it before using this software");
                 return [];
             }
-            
+
             cmdReturn = Utils.RunCommand("sh", "-c \"grep\"");
             if (cmdReturn.ExitCode == 127)
             {
                 Log.Error("Failed to find the 'grep' command line utility, please install it before using this software");
                 return [];
             }
-            
+
             cmdReturn = Utils.RunCommand("sh", "-c \"which clang\"");
             if (cmdReturn.ExitCode == 1)
             {
