@@ -53,11 +53,7 @@ namespace Buildozer.BuildTool
             if (!BuildContext.EnableExceptions)
                 Definitions.Add("_HAS_EXCEPTIONS=0");
 
-            CompilerOptions.AddRange([
-                "/nologo",
-                "/showIncludes"
-            ]);
-
+            CompilerOptions.AddRange(["/nologo", "/showIncludes"]);
 
             BuildConfigCompilerOptions[BuildConfig.Debug].AddRange(debugFlags);
             BuildConfigCompilerOptions[BuildConfig.Develop].AddRange(developFlags);
@@ -76,10 +72,6 @@ namespace Buildozer.BuildTool
             string objPath = Path.Join(Path.GetTempPath(), "check_header.obj");
             File.WriteAllText(filePath, $"#include <{header}>\n int main(){{return 0;}}");
             var res = Utils.RunCommand(Path.Join(BinRoot, CompilerName), $"/nologo /c /std:{BuildContext.CurrentCxxVersion} {String.Join(" ", IncludeDirs.Select(dir => $"/I\"{dir}\""))}  \"{filePath}\" /Fo\"{objPath}\"");
-
-            // We delete these now because only God knows when Windows will clean the temp folder
-            File.Delete(filePath);
-            File.Delete(objPath);
             return res.ExitCode == 0;
         }
 
@@ -120,13 +112,12 @@ namespace Buildozer.BuildTool
                 $"{String.Join(" ", Definitions.Select(d => $"/D{d}"))} " +
                 $"{String.Join(" ", BuildConfigDefinitions[buildConfig].Select(d => $"/D{d}"))} " +
                 $"$defines $flags $includes $in /Fo$out");
-            rule.AppendLine("  description= Compiling CXX $in");
+            rule.AppendLine("  description= Compiling CXX file $in");
             return rule.ToString();
         }
 
         private string GenerateCCompileRule(BuildConfig buildConfig, string name)
         {
-            /*
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
             rule.AppendLine("  " +
@@ -137,26 +128,13 @@ namespace Buildozer.BuildTool
                 $"{String.Join(" ", Definitions.Select(d => $"/D{d}"))} " +
                 $"{String.Join(" ", BuildConfigDefinitions[buildConfig].Select(d => $"/D{d}"))} " +
                 $"$defines $flags $includes $in /Fo$out");
-            rule.AppendLine("  description = Compiling C $in");
+            rule.AppendLine("  description = Compiling C file $in");
             return rule.ToString();
-            */
         }
 
         private string GenerateLinkRule(BuildConfig buildConfig, BuildLinkType linkType, string name)
         {
-            
-            StringBuilder rule = new StringBuilder();
-            rule.AppendLine($"rule {name}");
-            rule.AppendLine(String.Format("  command=\"{0}\" {1} {2} {3} {4} {5} {6} $in /OUT:$out",
-                linkType == BuildLinkType.Shared ? "/DLL" : "",
-                String.Join(" ", LinkerOptions),
-                String.Join(" ", BuildConfigLinkerOptions[buildConfig]),
-                String.Join(" ", LibraryDirs.Select(dir => $"/LIBPATH:\"{dir}\"")),
-                String.Join(" ", Libraries),
-                String.Join(" ", BuildConfigLibraries[buildConfig])));
-            rule.AppendLine($"  description = Linking {(linkType == BuildLinkType.Shared ? "shared library" : "executable")} $out");
-            return rule.ToString();
-            /*
+
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
             rule.AppendLine("  " +
@@ -170,30 +148,19 @@ namespace Buildozer.BuildTool
                 $"$in /OUT:$out");
             rule.AppendLine($"  description = Linking {(linkType == BuildLinkType.Shared ? "shared library" : "executable")} $out");
             return rule.ToString();
-            */
         }
 
         private string GenerateArchiveRule(BuildConfig buildConfig, string name)
         {
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
-            rule.AppendLine(String.Format("  command=\"{0}\" /nologo {1} $in /OUT:$out",
-                Path.Join(BinRoot, LibrarianName),
-                buildConfig == BuildConfig.Release ? "/LTCG" : ""));
-            rule.AppendLine($"  description = Archiving library $out");
-            return rule.ToString();
-
-            /*
-            StringBuilder rule = new StringBuilder();
-            rule.AppendLine($"rule {name}");
             rule.AppendLine("  " +
                 $"command=\"{Path.Join(BinRoot, LibrarianName)}\" " +
-                "/NOLOGO " +
+                "/nologo " +
                 $"{(buildConfig == BuildConfig.Release ? "/LTCG" : "")} " +
                 $"$in /OUT:$out");
-            rule.AppendLine($"  description = Archiving library $out");
+            rule.AppendLine($"  description = Archiving static library $out");
             return rule.ToString();
-            */
         }
     }
 }

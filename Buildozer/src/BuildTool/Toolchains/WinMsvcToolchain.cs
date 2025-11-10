@@ -14,7 +14,7 @@ namespace Buildozer.BuildTool
             Version msvcVersion, 
             Version winSdkVersion) : base (platform, arch, msvcVersion) 
         {
-            Name = "MSVC";
+            Name = "Windows MSVC";
 
             WinSdkVersion = winSdkVersion;
 

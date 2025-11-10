@@ -12,7 +12,7 @@ partial class Program
             .CreateLogger();
 
         Toolchain[] toolchains = Toolchain.DiscoverSystemToolchains();
-        //Console.WriteLine(toolchains[0].HasHeader("windows.h"));
+        Console.WriteLine(toolchains[0].GenerateNinjaToolchain());
     }
 }
 
