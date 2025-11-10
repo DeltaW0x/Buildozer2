@@ -20,6 +20,30 @@ namespace Buildozer.BuildTool
             ObjectFileExtension = ".obj";
             HasImportLibs = true;
 
+            string[] debugFlags = {
+                "/MDd",
+                "/Od",
+                "/GS",
+                "/Oy-",
+                "/Zi",
+                "/RTC1"
+            };
+            string[] developFlags = {
+                "/MDd",
+                "/O1",
+                "/GS",
+                "/Oy-",
+                "/Zi",
+                "/RTC1"
+            };
+            string[] releaseFlags = {
+                "/MD",
+                "/O2",
+                "/GS",
+                "/GL",
+                "/Zi",
+            };
+
             CFlags.Add($"/std:{BuildContext.CurrentCVersion}");
             CXXFlags.AddRange([
                 $"/std:{BuildContext.CurrentCxxVersion}",
@@ -33,6 +57,11 @@ namespace Buildozer.BuildTool
                 "/nologo",
                 "/showIncludes"
             ]);
+
+
+            BuildConfigCompilerOptions[BuildConfig.Debug].AddRange(debugFlags);
+            BuildConfigCompilerOptions[BuildConfig.Develop].AddRange(developFlags);
+            BuildConfigCompilerOptions[BuildConfig.Release].AddRange(releaseFlags);
 
             BuildConfigLinkerOptions[BuildConfig.Debug].AddRange(["/INCREMENTAL:NO", "/DEBUG"]);
             BuildConfigLinkerOptions[BuildConfig.Develop].AddRange(["/INCREMENTAL:YES", "/DEBUG"]);

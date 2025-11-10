@@ -20,22 +20,6 @@ namespace Buildozer.BuildTool
 
             ExecutableExtension = "exe";
 
-            string[] debugFlags = {
-                "/MDd",
-                "/Od",
-                "/GS",
-                "/Oy-",
-                "/Zi",
-                "/RTC1"
-            };
-            string[] releaseFlags = {
-                "/MD",
-                "/O2",
-                "/GS",
-                "/GL",
-                "/Zi",
-            };
-
             string[] debugLibs = {
                 "vcruntimed.lib",
                 "ucrtd.lib"
@@ -55,10 +39,6 @@ namespace Buildozer.BuildTool
             BuildConfigLibraries[BuildConfig.Debug].AddRange(debugLibs);
             BuildConfigLibraries[BuildConfig.Develop].AddRange(debugLibs);
             BuildConfigLibraries[BuildConfig.Release].AddRange(releaseLibs);
-
-            BuildConfigCompilerOptions[BuildConfig.Debug].AddRange(debugFlags);
-            BuildConfigCompilerOptions[BuildConfig.Develop].AddRange(debugFlags);
-            BuildConfigCompilerOptions[BuildConfig.Release].AddRange(releaseFlags);
         }
     }
 }
