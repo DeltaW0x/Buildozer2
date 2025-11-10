@@ -12,6 +12,9 @@ partial class Program
             .CreateLogger();
 
         Toolchain[] toolchains = Toolchain.DiscoverSystemToolchains();
+        File.WriteAllText(@"C:\Users\lucac\Desktop\compilation_test\build.ninja", toolchains[0].GenerateNinjaToolchain());
+        File.AppendAllText(@"C:\Users\lucac\Desktop\compilation_test\build.ninja", toolchains[0].GenerateNinjaCxxCompilationCommand("main.cpp"));
+        File.AppendAllText(@"C:\Users\lucac\Desktop\compilation_test\build.ninja", toolchains[0].GenerateNinjaLinkCommand(false, "main", ["main.obj"]));
     }
 }
 

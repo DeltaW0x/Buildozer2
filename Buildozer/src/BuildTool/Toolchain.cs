@@ -51,9 +51,13 @@ namespace Buildozer.BuildTool
         public Dictionary<BuildConfig, List<string>> BuildConfigLibraries { get; set; } = new();
         public Dictionary<BuildConfig, List<string>> BuildConfigCompilerOptions { get; set; } = new();
         public Dictionary<BuildConfig, List<string>> BuildConfigLinkerOptions { get; set; } = new();
+        public Dictionary<BuildConfig, List<string>> BuildConfigLibrarianOptions { get; set; } = new();
 
         public Dictionary<BuildConfig, List<string>> BuildConfigDeployLibraries {  get; set; } = new();
 
+        protected Toolchain()
+        {
+        }
         protected Toolchain(OSPlatform platform, Architecture arch)
         {
             ToolchainPlatform = platform;
@@ -74,6 +78,10 @@ namespace Buildozer.BuildTool
             BuildConfigLinkerOptions[BuildConfig.Debug] = new();
             BuildConfigLinkerOptions[BuildConfig.Develop] = new();
             BuildConfigLinkerOptions[BuildConfig.Release] = new();
+
+            BuildConfigLibrarianOptions[BuildConfig.Debug] = new();
+            BuildConfigLibrarianOptions[BuildConfig.Develop] = new();
+            BuildConfigLibrarianOptions[BuildConfig.Release] = new();
 
             BuildConfigDeployLibraries[BuildConfig.Debug] = new();
             BuildConfigDeployLibraries[BuildConfig.Develop] = new();
@@ -96,8 +104,10 @@ namespace Buildozer.BuildTool
         }
 
         public abstract bool HasHeader(string name);
-
         public abstract string GenerateNinjaToolchain();
+        public abstract string GenerateNinjaCCompilationCommand(string source);
+        public abstract string GenerateNinjaCxxCompilationCommand(string source);
+        public abstract string GenerateNinjaLinkCommand(bool sharedLib, string outName, params string[] objects);
 
         public static Toolchain[] DiscoverSystemToolchains()
         {
@@ -143,7 +153,7 @@ namespace Buildozer.BuildTool
                     Log.Error("Failed to find a suitable Windows SDK installation. Please install the Windows SDK and try again");
                     return [];
                 }
-                if (winSdkVersion == null || winSdkVersion < BuildContext.MiniumWinSdkVersion)
+                if (winSdkVersion == null || winSdkVersion < BuildContext.MiniumWindowsSdkVersion)
                 {
                     Log.Error("Failed to find a suitable Windows SDK version. Please install the Windows SDK and try again");
                     return [];
@@ -162,7 +172,7 @@ namespace Buildozer.BuildTool
                         var vsInstance = (ISetupInstance2)instances[0];
 
                         Version vsVersion = new(vsInstance.GetInstallationVersion());
-                        if (vsVersion.Major != BuildContext.MinimumVsVersion.Major)
+                        if (vsVersion.Major != BuildContext.MinimumVisualStudioVersion.Major)
                             continue;
 
                         string msvcPath = Path.Join(vsInstance.GetInstallationPath(), "VC", "Tools", "MSVC");
@@ -188,7 +198,7 @@ namespace Buildozer.BuildTool
                                     if (!Directory.Exists(Path.Join(msvcDir, "bin", "Hostx64", "x64")))
                                         continue;
 
-                                    WinMsvcToolchain hostToolchain = new WinMsvcToolchain(OSPlatform.Windows, Architecture.X64, msvcVer, winSdkVersion);
+                                    WindowsMsvcToolchain hostToolchain = new WindowsMsvcToolchain(OSPlatform.Windows, Architecture.X64, msvcVer, winSdkVersion);
                                     hostToolchain.IsCrossCompiler = false;
                                     hostToolchain.BinRoot = Path.Join(msvcDir, "bin", "Hostx64", "x64");
                                     hostToolchain.IncludeDirs.Add(Path.Combine(msvcDir, "include"));
@@ -198,7 +208,7 @@ namespace Buildozer.BuildTool
                                         Path.Combine(winSdkPath, "lib", winSdkVersion.ToString(), "um", "x64"),
                                         Path.Combine(winSdkPath, "lib", winSdkVersion.ToString(), "ucrt", "x64")
                                     ]);
-
+                                    hostToolchain.CompilerOptions.Add("/arch:SSE4.2");
                                     if(File.Exists(Path.Join(msvcDir, "lib", "x64", "clang_rt.asan_dbg_dynamic-x86_64.lib")) &&
                                        File.Exists(Path.Join(msvcDir, "lib", "x64", "clang_rt.asan_dynamic_runtime_thunk-x86_64.lib")))
                                     {

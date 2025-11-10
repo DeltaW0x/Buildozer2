@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO.Compression;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Text;
 
 namespace Buildozer.BuildTool
@@ -15,9 +17,10 @@ namespace Buildozer.BuildTool
             LinkerName = "link.exe";
             LibrarianName = "lib.exe";
 
-            SharedLibExtension = ".dll";
-            StaticLibExtension = ".lib";
-            ObjectFileExtension = ".obj";
+            SharedLibExtension = "dll";
+            StaticLibExtension = "lib";
+            ObjectFileExtension = "obj";
+
             HasImportLibs = true;
 
             string[] debugFlags = {
@@ -33,8 +36,7 @@ namespace Buildozer.BuildTool
                 "/O1",
                 "/GS",
                 "/Oy-",
-                "/Zi",
-                "/RTC1"
+                "/Zi"
             };
             string[] releaseFlags = {
                 "/MD",
@@ -44,26 +46,49 @@ namespace Buildozer.BuildTool
                 "/Zi",
             };
 
-            CFlags.Add($"/std:{BuildContext.CurrentCVersion}");
+            CFlags.Add($"/std:{BuildContext.CurrentCVersion switch
+            {
+                BuildLanguageVersion.C11 => "c11",
+                _ => throw new ArgumentException("Invalid C version")
+            }}");
+
             CXXFlags.AddRange([
-                $"/std:{BuildContext.CurrentCxxVersion}",
-                $"/EHsc{(BuildContext.EnableExceptions ? "" : "-")}"
+                "/Zc:__cplusplus",
+                $"/EHsc{(BuildContext.EnableExceptions ? "" : "-")}",
+                $"/std:{BuildContext.CurrentCxxVersion switch
+                    {
+                        BuildLanguageVersion.Cxx17 => "c++17",
+                        BuildLanguageVersion.Cxx20 => "c++20",
+                        _ => throw new ArgumentException("Invalid C++ version")
+                    }
+                }",
+                $"/{BuildContext.CurrentWarningLevel switch
+                    {
+                        BuildWarningLevel.W0 => "W0",
+                        BuildWarningLevel.W1 => "W1",
+                        BuildWarningLevel.W2 => "W2",
+                        BuildWarningLevel.W3 => "W3",
+                        _ => throw new ArgumentException("Invalid compiler warning level")
+                    }
+                }"
             ]);
 
             if (!BuildContext.EnableExceptions)
                 Definitions.Add("_HAS_EXCEPTIONS=0");
 
-            CompilerOptions.AddRange(["/nologo", "/showIncludes"]);
+            LibrarianOptions.Add("/nologo");
+            CompilerOptions.AddRange(["/nologo", "/showIncludes", "/utf-8"]);
+            LinkerOptions.AddRange(["/nologo", $"/MACHINE:{(ToolchainArchitecture == Architecture.X64 ? "X64" : "ARM64")}"]);
 
             BuildConfigCompilerOptions[BuildConfig.Debug].AddRange(debugFlags);
             BuildConfigCompilerOptions[BuildConfig.Develop].AddRange(developFlags);
             BuildConfigCompilerOptions[BuildConfig.Release].AddRange(releaseFlags);
 
             BuildConfigLinkerOptions[BuildConfig.Debug].AddRange(["/INCREMENTAL:NO", "/DEBUG"]);
-            BuildConfigLinkerOptions[BuildConfig.Develop].AddRange(["/INCREMENTAL:YES", "/DEBUG"]);
-            BuildConfigLinkerOptions[BuildConfig.Release].AddRange(["/INCREMENTAL:NO", "/LTCG", "/OPT:REF", "/OPT:ICF"]);
+            BuildConfigLinkerOptions[BuildConfig.Develop].Add("/DEBUG");
+            BuildConfigLinkerOptions[BuildConfig.Release].AddRange(["/INCREMENTAL:NO", "/LTCG", "/OPT:REF", "/OPT:ICF", "/DEBUG"]);
 
-            LinkerOptions.Add($"/MACHINE:{(ToolchainArchitecture == Architecture.X64 ? "X64" : "ARM64")}");
+            BuildConfigLibrarianOptions[BuildConfig.Release].Add("/LTCG");
         }
 
         public override bool HasHeader(string header)
@@ -78,30 +103,65 @@ namespace Buildozer.BuildTool
         public override string GenerateNinjaToolchain()
         {
             StringBuilder ninjaFile = new StringBuilder();
-            ninjaFile.AppendLine(GenerateCxxCompileRule(BuildConfig.Debug, "CXX_DEBUG_COMPILE"));
-            ninjaFile.AppendLine(GenerateCxxCompileRule(BuildConfig.Develop, "CXX_DEVELOP_COMPILE"));
-            ninjaFile.AppendLine(GenerateCxxCompileRule(BuildConfig.Release, "CXX_RELEASE_COMPILE"));
-
-            ninjaFile.AppendLine(GenerateCCompileRule(BuildConfig.Debug, "C_DEBUG_COMPILE"));
-            ninjaFile.AppendLine(GenerateCCompileRule(BuildConfig.Develop, "C_DEVELOP_COMPILE"));
-            ninjaFile.AppendLine(GenerateCCompileRule(BuildConfig.Release, "C_RELEASE_COMPILE"));
-
-            ninjaFile.AppendLine(GenerateLinkRule(BuildConfig.Debug, BuildLinkType.Shared, "LINK_DEBUG_SHARED"));
-            ninjaFile.AppendLine(GenerateLinkRule(BuildConfig.Develop, BuildLinkType.Shared, "LINK_DEVELOP_SHARED"));
-            ninjaFile.AppendLine(GenerateLinkRule(BuildConfig.Release, BuildLinkType.Shared, "LINK_RELEASE_SHARED"));
-
-            ninjaFile.AppendLine(GenerateLinkRule(BuildConfig.Debug, BuildLinkType.Executable, "LINK_DEBUG_EXECUTABLE"));
-            ninjaFile.AppendLine(GenerateLinkRule(BuildConfig.Develop, BuildLinkType.Executable, "LINK_DEVELOP_EXECUTABLE"));
-            ninjaFile.AppendLine(GenerateLinkRule(BuildConfig.Release, BuildLinkType.Executable, "LINK_RELEASE_EXECUTABLE"));
-
-            ninjaFile.AppendLine(GenerateArchiveRule(BuildConfig.Debug, "ARCHIVE_DEBUG"));
-            ninjaFile.AppendLine(GenerateArchiveRule(BuildConfig.Develop, "ARCHIVE_DEVELOP"));
-            ninjaFile.AppendLine(GenerateArchiveRule(BuildConfig.Release, "ARCHIVE_RELEASE"));
+            ninjaFile.AppendLine("msvc_deps_prefix = Note: including file: ");
+            ninjaFile.AppendLine();
+            ninjaFile.AppendLine(GenerateCompileRule("COMPILER"));
+            ninjaFile.AppendLine(GenerateLinkRule("LINKER"));
+            ninjaFile.AppendLine(GenerateArchiveRule("ARCHIVER"));
             return ninjaFile.ToString();
         }
 
-        private string GenerateCxxCompileRule(BuildConfig buildConfig, string name)
+        public override string GenerateNinjaCCompilationCommand(string source)
         {
+            return "";
+        }
+
+        public override string GenerateNinjaCxxCompilationCommand(string source)
+        {
+            string depFile = $"{Path.GetFileNameWithoutExtension(source)}.{ObjectFileExtension}.d";
+
+            string compilerOptions = String.Join(" ", CompilerOptions);
+            string confCompilerOptions = String.Join(" ", BuildConfigCompilerOptions[BuildContext.CurrentBuildConfig]);
+            string cxxFlags = String.Join(" ", CXXFlags);
+            string includeDirs = String.Join(" ", IncludeDirs.Select(dir => $"/I\"{dir}\""));
+            string definitions = String.Join(" ", Definitions.Select(d => $"/D{d}"));
+            string confDefinitions = String.Join(" ", BuildConfigDefinitions[BuildContext.CurrentBuildConfig].Select(d => $"/D{d}"));
+
+            StringBuilder buildCommand = new StringBuilder();
+            buildCommand.AppendLine($"build {Path.GetFileNameWithoutExtension(source)}.{ObjectFileExtension}: COMPILER {source}");
+            buildCommand.AppendLine($"  DEPFILE = \"{depFile}\"");
+            buildCommand.AppendLine($"  DEPFILE_UNQUOTED = {depFile}");
+            buildCommand.AppendLine($"  ARGS = {compilerOptions} {confCompilerOptions} {cxxFlags} {includeDirs} {definitions} {confDefinitions}");
+            buildCommand.AppendLine();
+            return buildCommand.ToString();
+        }
+
+        public override string GenerateNinjaLinkCommand(bool sharedLib, string outName, params string[] objects)
+        {
+            string linkerOptions = String.Join(" ", LinkerOptions);
+            string confLinkerOptions = String.Join(" ", BuildConfigLinkerOptions[BuildContext.CurrentBuildConfig]);
+            string libraryDirs = String.Join(" ", LibraryDirs.Select(dir => $"/LIBPATH:\"{dir}\""));
+            string libraries = String.Join(" ", Libraries);
+            string confLibraries = String.Join(" ", BuildConfigLibraries[BuildContext.CurrentBuildConfig]);
+            string files = String.Join(" ", objects);
+
+            StringBuilder linkCommand = new StringBuilder();
+            linkCommand.AppendLine($"build {outName}.{(sharedLib ? SharedLibExtension : ExecutableExtension)}: LINKER {files}");
+            linkCommand.AppendLine($"  ARGS = {linkerOptions} {confLinkerOptions} {libraryDirs} {libraries} {confLibraries}");
+            linkCommand.AppendLine();
+            return linkCommand.ToString();
+        }
+
+        private string GenerateCompileRule(string name)
+        {
+            StringBuilder rule = new StringBuilder();
+            rule.AppendLine($"rule {name}");
+            rule.AppendLine($"  command = \"{Path.Join(BinRoot, CompilerName)}\" $ARGS $CFLAGS $CXXFLAGS /Fo$out /c $in");
+            rule.AppendLine($"  deps = msvc");
+            rule.AppendLine($"  description = Compiling C++ object $out");
+            return rule.ToString();
+
+            /*
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
             rule.AppendLine("  " +
@@ -114,27 +174,18 @@ namespace Buildozer.BuildTool
                 $"$defines $flags $includes $in /Fo$out");
             rule.AppendLine("  description= Compiling CXX file $in");
             return rule.ToString();
+            */
         }
 
-        private string GenerateCCompileRule(BuildConfig buildConfig, string name)
+        private string GenerateLinkRule(string name)
         {
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
-            rule.AppendLine("  " +
-                $"command=\"{Path.Join(BinRoot, CompilerName)}\" " +
-                $"/c {String.Join(" ", CompilerOptions)} {String.Join(" ", BuildConfigCompilerOptions[buildConfig])}" +
-                $"{String.Join(" ", CFlags)}" +
-                $"{String.Join(" ", IncludeDirs.Select(dir => $"/I\"{dir}\""))} " +
-                $"{String.Join(" ", Definitions.Select(d => $"/D{d}"))} " +
-                $"{String.Join(" ", BuildConfigDefinitions[buildConfig].Select(d => $"/D{d}"))} " +
-                $"$defines $flags $includes $in /Fo$out");
-            rule.AppendLine("  description = Compiling C file $in");
+            rule.AppendLine($"  command = \"{Path.Join(BinRoot, LinkerName)}\" $ARGS /OUT:$out $in");
+            rule.AppendLine($"  description = Linking target $out");
             return rule.ToString();
-        }
 
-        private string GenerateLinkRule(BuildConfig buildConfig, BuildLinkType linkType, string name)
-        {
-
+            /*
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
             rule.AppendLine("  " +
@@ -148,10 +199,17 @@ namespace Buildozer.BuildTool
                 $"$in /OUT:$out");
             rule.AppendLine($"  description = Linking {(linkType == BuildLinkType.Shared ? "shared library" : "executable")} $out");
             return rule.ToString();
+            */
         }
-
-        private string GenerateArchiveRule(BuildConfig buildConfig, string name)
+        private string GenerateArchiveRule(string name)
         {
+            StringBuilder rule = new StringBuilder();
+            rule.AppendLine($"rule {name}");
+            rule.AppendLine($"  command = \"{Path.Join(BinRoot, LibrarianName)}\" $ARGS /OUT:$out $in");
+            rule.AppendLine($"  description = Archiving target $out");
+            return rule.ToString();
+
+            /*
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
             rule.AppendLine("  " +
@@ -161,6 +219,7 @@ namespace Buildozer.BuildTool
                 $"$in /OUT:$out");
             rule.AppendLine($"  description = Archiving static library $out");
             return rule.ToString();
+            */
         }
     }
 }
