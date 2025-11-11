@@ -7,39 +7,36 @@ namespace Buildozer.BuildTool
 {
     public class WindowsMsvcToolchain : MsvcToolchainBase
     {
-        public readonly Version WinSdkVersion;
+        public Version WinSdkVersion { get; set; }
 
         public WindowsMsvcToolchain(
-            OSPlatform platform, 
-            Architecture arch,
-            Version msvcVersion, 
-            Version winSdkVersion) : base (platform, arch, msvcVersion) 
+            OSPlatform toolchainPlatform, 
+            Architecture toolchainArchitecture,
+            Version compilerVersion, 
+            Version winSdkVersion) : base (toolchainPlatform, toolchainArchitecture, compilerVersion) 
         {
             Name = "Windows MSVC";
-
             WinSdkVersion = winSdkVersion;
-
             ExecutableExtension = "exe";
 
-            string[] debugLibs = {
-                "vcruntimed.lib",
-                "ucrtd.lib"
-            };
-            string[] releaseLibs = {
-                "vcruntime.lib",
-                "ucrt.lib"
-            };
-
-            Definitions.AddRange([
+            Defines.AddRange([
                 "WIN32",
                 "_WIN32",
                 "__WINDOWS__",
+                "WINVER=0x0A00",
                 "STOMPER_PLATFORM_WIN32" 
             ]);
 
-            BuildConfigLibraries[BuildConfig.Debug].AddRange(debugLibs);
-            BuildConfigLibraries[BuildConfig.Develop].AddRange(debugLibs);
-            BuildConfigLibraries[BuildConfig.Release].AddRange(releaseLibs);
+            switch (BuildContext.CurrentBuildConfig)
+            {
+                case BuildConfig.Debug:
+                case BuildConfig.Develop:
+                    Libraries.AddRange(["vcruntimed.lib","ucrtd.lib"]);
+                    break;
+                case BuildConfig.Release:
+                    Libraries.AddRange(["vcruntime.lib", "ucrt.lib"]);
+                    break;
+            }
 
             Libraries.AddRange([
                 "kernel32.lib",
@@ -52,7 +49,6 @@ namespace Buildozer.BuildTool
                 "advapi32.lib",
                 "gdi32.lib",
             ]);
-            Definitions.Add("WINVER=0x0A00");
         }
     }
 }

@@ -3,9 +3,14 @@ using Microsoft.Win32;
 using Serilog;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Text.Json.Serialization;
 
 namespace Buildozer.BuildTool
 {
+    [JsonDerivedType(typeof(WindowsMsvcToolchain), "windows_msvc_toolchain")]
+    [JsonDerivedType(typeof(LinuxClangToolchain), "linux_clang_toolchain")]
+    [JsonDerivedType(typeof(MacOSClangToolchain), "macos_clang_toolchain")]
+    [JsonDerivedType(typeof(IphoneOSClangToolchain), "ios_clang_toolchain")]
     public abstract class Toolchain
     {
         public string Name { get; protected set; } = "";
@@ -33,9 +38,8 @@ namespace Buildozer.BuildTool
         public string ExecutableExtension { get; protected set; } = "";
         public string ObjectFileExtension { get; protected set; } = "";
 
-        public List<string> Definitions { get; set; } = new();
+        public List<string> Defines { get; set; } = new();
         public List<string> Libraries { get; set; } = new();
-        public List<string> Frameworks { get; set; } = new();
 
         public List<string> IncludeDirs { get; set; } = new();
         public List<string> LibraryDirs { get; set; } = new();
@@ -47,60 +51,29 @@ namespace Buildozer.BuildTool
         public List<string> LibrarianOptions { get; set; } = new();
         public List<string> StripperOptions { get; set; } = new();
 
-        public Dictionary<BuildConfig, List<string>> BuildConfigDefinitions { get; set; } = new();
-        public Dictionary<BuildConfig, List<string>> BuildConfigLibraries { get; set; } = new();
-        public Dictionary<BuildConfig, List<string>> BuildConfigCompilerOptions { get; set; } = new();
-        public Dictionary<BuildConfig, List<string>> BuildConfigLinkerOptions { get; set; } = new();
-        public Dictionary<BuildConfig, List<string>> BuildConfigLibrarianOptions { get; set; } = new();
-
-        public Dictionary<BuildConfig, List<string>> BuildConfigDeployLibraries {  get; set; } = new();
-
         protected Toolchain()
         {
         }
-        protected Toolchain(OSPlatform platform, Architecture arch)
+        protected Toolchain(OSPlatform toolchainPlatform, Architecture toolchainArchitecture, Version compilerVersion)
         {
-            ToolchainPlatform = platform;
-            ToolchainArchitecture = arch;
+            ToolchainPlatform = toolchainPlatform;
+            ToolchainArchitecture = toolchainArchitecture;
+            CompilerVersion = compilerVersion;
 
-            BuildConfigDefinitions[BuildConfig.Debug] = new();
-            BuildConfigDefinitions[BuildConfig.Develop] = new();
-            BuildConfigDefinitions[BuildConfig.Release] = new();
+            Defines.Add(ToolchainArchitecture == Architecture.X64 ? "STOMPER_ARCH_X64" : "STOMPER_ARCH_ARM64");
 
-            BuildConfigLibraries[BuildConfig.Debug] = new();
-            BuildConfigLibraries[BuildConfig.Develop] = new();
-            BuildConfigLibraries[BuildConfig.Release] = new();
-
-            BuildConfigCompilerOptions[BuildConfig.Debug] = new();
-            BuildConfigCompilerOptions[BuildConfig.Develop] = new();
-            BuildConfigCompilerOptions[BuildConfig.Release] = new();
-
-            BuildConfigLinkerOptions[BuildConfig.Debug] = new();
-            BuildConfigLinkerOptions[BuildConfig.Develop] = new();
-            BuildConfigLinkerOptions[BuildConfig.Release] = new();
-
-            BuildConfigLibrarianOptions[BuildConfig.Debug] = new();
-            BuildConfigLibrarianOptions[BuildConfig.Develop] = new();
-            BuildConfigLibrarianOptions[BuildConfig.Release] = new();
-
-            BuildConfigDeployLibraries[BuildConfig.Debug] = new();
-            BuildConfigDeployLibraries[BuildConfig.Develop] = new();
-            BuildConfigDeployLibraries[BuildConfig.Release] = new();
-
-            Definitions.Add(ToolchainArchitecture == Architecture.X64 ? "STOMPER_ARCH_X64" : "STOMPER_ARCH_ARM64");
-
-            BuildConfigDefinitions[BuildConfig.Release].AddRange([
-                "NDEBUG",
-                "STOMPER_RELEASE"
-            ]);
-            BuildConfigDefinitions[BuildConfig.Develop].AddRange([
-                "DEBUG",
-                "STOMPER_DEVELOP"
-            ]);
-            BuildConfigDefinitions[BuildConfig.Debug].AddRange([
-                "DEBUG",
-                "STOMPER_DEBUG"
-            ]);
+            switch(BuildContext.CurrentBuildConfig)
+            {
+                case BuildConfig.Debug:
+                    Defines.AddRange(["DEBUG", "STOMPER_DEBUG"]);
+                    break;
+                case BuildConfig.Develop:
+                    Defines.AddRange(["DEBUG", "STOMPER_DEVELOP"]);
+                    break;
+                case BuildConfig.Release:
+                    Defines.AddRange(["NDEBUG", "STOMPER_RELEASE"]);
+                    break;
+            }
         }
 
         public abstract bool HasHeader(string name);
@@ -213,12 +186,14 @@ namespace Buildozer.BuildTool
                                        File.Exists(Path.Join(msvcDir, "lib", "x64", "clang_rt.asan_dynamic_runtime_thunk-x86_64.lib")))
                                     {
                                         hostToolchain.HasASan = true;
-                                        hostToolchain.BuildConfigCompilerOptions[BuildConfig.Debug].Add("/fsanitize=address");
-                                        hostToolchain.BuildConfigLibraries[BuildConfig.Debug].AddRange([
-                                            "clang_rt.asan_dbg_dynamic-x86_64.lib",
-                                            "clang_rt.asan_dynamic_runtime_thunk-x86_64.lib"
-                                        ]);
-                                        hostToolchain.BuildConfigDeployLibraries[BuildConfig.Debug].Add("clang_rt.asan_dbg_dynamic-x86_64.dll");
+                                        if(BuildContext.CurrentBuildConfig == BuildConfig.Debug)
+                                        {
+                                            hostToolchain.CompilerOptions.Add("/fsanitize=address");
+                                            hostToolchain.Libraries.AddRange([
+                                                "clang_rt.asan_dbg_dynamic-x86_64.lib",
+                                                "clang_rt.asan_dynamic_runtime_thunk-x86_64.lib"
+                                            ]);
+                                        }
                                     }
                                     toolchains.Add(hostToolchain);
                                 }
