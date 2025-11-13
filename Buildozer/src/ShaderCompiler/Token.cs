@@ -22,7 +22,7 @@ namespace Buildozer.ShaderCompiler
 
         Fn, Return,
 
-        Var,
+        Var, Const,
 
         Intrinsic,
 

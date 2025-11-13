@@ -2,6 +2,8 @@
 {
     public class GLSLBackend : Expression.Visitor<string>, Statement.Visitor<string>
     {
+        private VariableEnvironment _globals = new VariableEnvironment();
+
         public string Compile(Statement[] statements)
         {
             foreach (var statement in statements) 
@@ -36,6 +38,16 @@
             return $"{expr.Operator.Lexeme}{Evaluate(expr.Right)}";
         }
 
+        public string VisitVariableExpr(VariableExpr expr)
+        {
+            object? value = _globals.Get(expr.Name);
+            if(value == null)
+            {
+                throw new ArgumentException("Invalid variable");
+            }
+            return value!.ToString()!;
+        }
+
         public string Evaluate(Expression expr)
         {
             return expr.Accept(this);
@@ -44,6 +56,16 @@
         public string VisitExpressionStmt(ExpressionStmt stmt)
         {
             return $"{Evaluate(stmt.Expr)};";
+        }
+
+        public string VisitVariableStmt(VariableStmt stmt)
+        {
+            object? value = null;
+            if(stmt.Initializer != null)
+                value = Evaluate(stmt.Initializer);
+
+            _globals.Define(stmt.Name.Lexeme, value!);
+            return $"<var_type> {stmt.Name.Lexeme} = {value!.ToString()!}";
         }
     }
 }

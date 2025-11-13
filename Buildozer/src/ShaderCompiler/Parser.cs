@@ -3,6 +3,25 @@ using Serilog;
 
 namespace Buildozer.ShaderCompiler
 {
+    internal class VariableEnvironment
+    {
+        public readonly Dictionary<string, object> Values = new Dictionary<string, object>();
+
+        public object? Get(Token name)
+        {
+            if(Values.TryGetValue(name.Lexeme, out object? value))
+                return value;
+
+            Log.Error($"Undefined variable '{name.Lexeme}'.");
+            return null;
+        }
+
+        public void Define(string name, object value)
+        {
+            Values[name] = value;
+        }
+    }
+
     public class Parser
     {
         private readonly Token[] _tokens;
@@ -13,19 +32,53 @@ namespace Buildozer.ShaderCompiler
             _tokens = tokens;
         }
 
-        public Statement[] Parse()
+        public Statement?[] Parse()
         {
-            List<Statement> statements = new List<Statement>();
+            List<Statement?> statements = new List<Statement?>();
 
             while (!IsEnd())
-                statements.Add(Statement());
+                statements.Add(Declaration());
 
             return statements.ToArray();
+        }
+
+        private Statement? Declaration()
+        {
+            if (Match(TokenType.Error))
+            {
+                Syncronize();
+                return null;
+            }
+
+            if (Match(TokenType.Var))
+                return VarDeclaration();
+
+            return Statement();
         }
 
         private Statement Statement()
         {
             return ExpressionStatement();
+        }
+
+        private Statement VarDeclaration()
+        {
+            List<Token> modifiers = new List<Token>();
+            while (Match(TokenType.Const))
+            {
+                modifiers.Add(Previous());
+            }
+
+            Token? name = Consume(TokenType.Identifier, "Expected variable name");
+
+            Expression? initializer = null;
+            if (Match(TokenType.Equal))
+            {
+                initializer = Expression();
+            }
+
+            Consume(TokenType.Semicolon, "Expected ';' after variable declaration");
+            return new VariableStmt(name!, modifiers.ToArray(), initializer);
         }
 
         private Statement ExpressionStatement()
@@ -114,13 +167,14 @@ namespace Buildozer.ShaderCompiler
                 return new GroupingExpr(expr);
             }
 
+            if (Match(TokenType.Identifier))
+                return new VariableExpr(Previous());
+
             if(Match(TokenType.Error))
                 return new ErrorExpr($"Invalid token {Previous().Lexeme} on line {Previous().Line}");
 
             return new ErrorExpr($"Error at line {Peek().Line} '{Peek().Lexeme}': Expected expression");
         }
-
-
 
         private Token? Consume(TokenType type, string errorMessage)
         {
@@ -131,13 +185,56 @@ namespace Buildozer.ShaderCompiler
             return null;
         }
         
+        private Token Advance()
+        {
+            if (!IsEnd()) 
+                _current++;
+            return Previous();
+        }
+
+        private Token Peek()
+        {
+            return _tokens[_current];
+        }
+
+        private Token Previous()
+        {
+            return _tokens[_current - 1];
+        }
+
+        private bool IsEnd()
+        {
+            return Peek().Type == TokenType.Eof;
+        }
+
+        private bool Match(params TokenType[] types)
+        {
+            foreach (TokenType type in types)
+            {
+                if (Check(type))
+                {
+                    Advance();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool Check(TokenType type)
+        {
+            if (IsEnd())
+                return false;
+            return Peek().Type == type;
+        }
+
         private void Syncronize()
         {
             Advance();
 
             while (!IsEnd())
             {
-                if (Previous().Type == TokenType.Semicolon) 
+                if (Previous().Type == TokenType.Semicolon)
                     return;
 
                 switch (Peek().Type)
@@ -154,49 +251,6 @@ namespace Buildozer.ShaderCompiler
 
                 Advance();
             }
-        }
-
-        private bool Match(params TokenType[] types)
-        {
-            foreach(TokenType type in types)
-            {
-                if (Check(type))
-                {
-                    Advance();
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        private bool Check(TokenType type)
-        {
-            if (IsEnd()) 
-                return false;
-            return Peek().Type == type;
-        }
-
-        private Token Advance()
-        {
-            if (!IsEnd()) 
-                _current++;
-            return Previous();
-        }
-
-        private bool IsEnd()
-        {
-            return Peek().Type == TokenType.Eof;
-        }
-
-        private Token Peek()
-        {
-            return _tokens[_current];
-        }
-
-        private Token Previous()
-        {
-            return _tokens[_current - 1];
         }
     }
 }

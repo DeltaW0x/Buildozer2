@@ -36,10 +36,10 @@ partial class Program
         Console.WriteLine(JsonSerializer.Serialize(releaseToolchain, new JsonSerializerOptions { WriteIndented = true, IncludeFields = true }));
         */
 
-        Scanner scanner = new Scanner("(10 * 2) - 3");
+        Scanner scanner = new Scanner("var a = 10;");
         Parser parser = new Parser(scanner.ScanTokens());
 
-        Console.WriteLine(new GLSLBackend().Compile(parser.Parse()));
+        Console.WriteLine(new GLSLBackend().Compile(parser.Parse()!));
     }
 }
 

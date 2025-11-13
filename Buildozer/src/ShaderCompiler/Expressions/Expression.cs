@@ -12,6 +12,7 @@ namespace Buildozer.ShaderCompiler
             T VisitGroupingExpr(GroupingExpr expr);
             T VisitLiteralExpr(LiteralExpr expr);
             T VisitUnaryExpr(UnaryExpr expr);
+            T VisitVariableExpr(VariableExpr expr);
             T VisitErrorExpr(ErrorExpr expr);
         }
 
@@ -81,6 +82,21 @@ namespace Buildozer.ShaderCompiler
         public override T Accept<T>(Visitor<T> visitor)
         {
             return visitor.VisitUnaryExpr(this);
+        }
+    }
+
+    public class VariableExpr : Expression
+    {
+        public readonly Token Name;
+
+        public VariableExpr(Token name)
+        {
+            Name = name;
+        }
+
+        public override T Accept<T>(Visitor<T> visitor)
+        {
+            return visitor.VisitVariableExpr(this);
         }
     }
 

@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Buildozer.ShaderCompiler
 {
-    
+    /*
     public class AstPrinter : Expression.Visitor<string>
     {
         public string Print(Expression expr)
@@ -38,6 +38,11 @@ namespace Buildozer.ShaderCompiler
             return Parenthesize(expr.Operator.Lexeme, expr.Right);
         }
 
+        public string VisitVariableExpr(VariableExpr expr)
+        {
+            throw new NotImplementedException();
+        }
+
         private string Parenthesize(String name, params Expression[] exprs)
         {
             StringBuilder builder = new StringBuilder();
@@ -52,5 +57,5 @@ namespace Buildozer.ShaderCompiler
             return builder.ToString();
         }
     }
-    
+    */
 }
