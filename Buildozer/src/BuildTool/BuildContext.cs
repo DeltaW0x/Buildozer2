@@ -14,8 +14,7 @@ public enum BuildLanguage
 {
     C,
     Cxx,
-    NetCore,
-    NetCoreAot
+    Csharp
 }
 
 public enum BuildLanguageVersion
@@ -25,19 +24,6 @@ public enum BuildLanguageVersion
     Cxx20,
     Net9,
     Net10,
-}
-
-public enum BuildConfig
-{
-    Debug,
-    Develop,
-    Release
-}
-
-public enum BuildLinkType
-{
-    Shared,
-    Executable
 }
 
 public static class BuildContext
@@ -54,8 +40,11 @@ public static class BuildContext
     public static BuildLanguageVersion CurrentCxxVersion => BuildLanguageVersion.Cxx20;
 
     public static bool EnableExceptions = false;
-    public static BuildConfig CurrentBuildConfig = BuildConfig.Develop;
     public static BuildWarningLevel CurrentWarningLevel = BuildWarningLevel.W3;
+    
+    public static TargetPlatform CurrentTargetPlaform;
+    public static TargetArchitecture CurrrentTargetArch;
+    public static TargetConfiguration CurrentBuildConfig = TargetConfiguration.Develop;
 
-    public static string BuildDir { get; set; } = @"C:/Users/lucac/Desktop/compilation_test/builddir";
+    public static string BuildDir { get; set; } = "";
 }
