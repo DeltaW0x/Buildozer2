@@ -22,8 +22,6 @@ namespace Buildozer.BuildTool
         public bool IsCrossCompiler { get; protected set; } = false;
         public bool HasASan { get; set; } = false;
         public bool HasImportLibs { get; protected set; } = false;
-
-        public string BinRoot { get; protected set; } = "";
         
         public Version CompilerVersion { get; protected set; } = new();
 
@@ -41,6 +39,7 @@ namespace Buildozer.BuildTool
         public List<string> Defines { get; set; } = new();
         public List<string> Libraries { get; set; } = new();
 
+        public string BinaryDir { get; protected set; } = "";
         public List<string> IncludeDirs { get; set; } = new();
         public List<string> LibraryDirs { get; set; } = new();
 
@@ -50,37 +49,6 @@ namespace Buildozer.BuildTool
         public List<string> LinkerOptions { get; set; } = new();
         public List<string> LibrarianOptions { get; set; } = new();
         public List<string> StripperOptions { get; set; } = new();
-
-        protected Toolchain()
-        {
-        }
-        protected Toolchain(OSPlatform toolchainPlatform, Architecture toolchainArchitecture, Version compilerVersion)
-        {
-            ToolchainPlatform = toolchainPlatform;
-            ToolchainArchitecture = toolchainArchitecture;
-            CompilerVersion = compilerVersion;
-
-            Defines.Add(ToolchainArchitecture == Architecture.X64 ? "STOMPER_ARCH_X64" : "STOMPER_ARCH_ARM64");
-
-            switch(BuildContext.CurrentBuildConfig)
-            {
-                case BuildConfig.Debug:
-                    Defines.AddRange(["DEBUG", "STOMPER_DEBUG"]);
-                    break;
-                case BuildConfig.Develop:
-                    Defines.AddRange(["DEBUG", "STOMPER_DEVELOP"]);
-                    break;
-                case BuildConfig.Release:
-                    Defines.AddRange(["NDEBUG", "STOMPER_RELEASE"]);
-                    break;
-            }
-        }
-
-        public abstract bool HasHeader(string name);
-        public abstract string GenerateNinjaToolchain();
-        public abstract string GenerateNinjaCCompilationCommand(string source);
-        public abstract string GenerateNinjaCxxCompilationCommand(string source);
-        public abstract string GenerateNinjaLinkCommand(bool sharedLib, string outName, params string[] objects);
 
         public static Toolchain[] DiscoverSystemToolchains()
         {
@@ -173,7 +141,7 @@ namespace Buildozer.BuildTool
 
                                     WindowsMsvcToolchain hostToolchain = new WindowsMsvcToolchain(OSPlatform.Windows, Architecture.X64, msvcVer, winSdkVersion);
                                     hostToolchain.IsCrossCompiler = false;
-                                    hostToolchain.BinRoot = Path.Join(msvcDir, "bin", "Hostx64", "x64");
+                                    hostToolchain.BinaryDir = Path.Join(msvcDir, "bin", "Hostx64", "x64");
                                     hostToolchain.IncludeDirs.Add(Path.Combine(msvcDir, "include"));
                                     hostToolchain.IncludeDirs.AddRange(winSdkIncludeDirs);
                                     hostToolchain.LibraryDirs.AddRange([
@@ -302,5 +270,36 @@ namespace Buildozer.BuildTool
             }
             return toolchains.ToArray();
         }
+
+        protected Toolchain()
+        {
+        }
+        protected Toolchain(OSPlatform toolchainPlatform, Architecture toolchainArchitecture, Version compilerVersion)
+        {
+            ToolchainPlatform = toolchainPlatform;
+            ToolchainArchitecture = toolchainArchitecture;
+            CompilerVersion = compilerVersion;
+
+            Defines.Add(ToolchainArchitecture == Architecture.X64 ? "STOMPER_ARCH_X64" : "STOMPER_ARCH_ARM64");
+
+            switch (BuildContext.CurrentBuildConfig)
+            {
+                case BuildConfig.Debug:
+                    Defines.AddRange(["DEBUG", "STOMPER_DEBUG"]);
+                    break;
+                case BuildConfig.Develop:
+                    Defines.AddRange(["DEBUG", "STOMPER_DEVELOP"]);
+                    break;
+                case BuildConfig.Release:
+                    Defines.AddRange(["NDEBUG", "STOMPER_RELEASE"]);
+                    break;
+            }
+        }
+
+        public abstract bool HasHeader(string name);
+        public abstract string GenerateNinjaToolchain();
+        public abstract string GenerateNinjaCCompilationCommand(string source);
+        public abstract string GenerateNinjaCxxCompilationCommand(string source);
+        public abstract string GenerateNinjaLinkCommand(bool sharedLib, string outName, params string[] objects);
     }
 }

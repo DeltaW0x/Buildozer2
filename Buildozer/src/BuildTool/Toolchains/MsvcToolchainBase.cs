@@ -78,7 +78,7 @@ namespace Buildozer.BuildTool
             string filePath = Path.Join(Path.GetTempPath(), "check_header.cpp");
             string objPath = Path.Join(Path.GetTempPath(), "check_header.obj");
             File.WriteAllText(filePath, $"#include <{header}>\n int main(){{return 0;}}");
-            var res = Utils.RunProcess(Path.Join(BinRoot, CompilerName), $"/nologo /c /std:{BuildContext.CurrentCxxVersion} {String.Join(" ", IncludeDirs.Select(dir => $"/I\"{dir}\""))}  \"{filePath}\" /Fo\"{objPath}\"");
+            var res = Utils.RunProcess(Path.Join(BinaryDir, CompilerName), $"/nologo /c /std:{BuildContext.CurrentCxxVersion} {String.Join(" ", IncludeDirs.Select(dir => $"/I\"{dir}\""))}  \"{filePath}\" /Fo\"{objPath}\"");
             return res.ExitCode == 0;
         }
 
@@ -93,9 +93,14 @@ namespace Buildozer.BuildTool
             return ninjaFile.ToString();
         }
 
-        public override string GenerateNinjaCCompilationCommand(string source)
+        public override string GenerateNinjaCCompilationCommand(string sourcePath)
         {
-            string depFile = $"{Path.GetFileNameWithoutExtension(source)}.{ObjectFileExtension}.d";
+            string depFile = Path.Join(
+                BuildContext.BuildDir,
+                sourcePath.Substring(sourcePath.IndexOf("src")), $"{Path.GetFileNameWithoutExtension(sourcePath)}.{ObjectFileExtension}.d");
+            string outputFile = Path.Join(
+                BuildContext.BuildDir, 
+                sourcePath.Substring(sourcePath.IndexOf("src")), $"{Path.GetFileNameWithoutExtension(sourcePath)}.{ObjectFileExtension}");
 
             string compilerOptions = String.Join(" ", CompilerOptions);
             string cFlags = String.Join(" ", CFlags);
@@ -103,7 +108,7 @@ namespace Buildozer.BuildTool
             string definitions = String.Join(" ", Defines.Select(d => $"/D{d}"));
 
             StringBuilder buildCommand = new StringBuilder();
-            buildCommand.AppendLine($"build {Path.GetFileNameWithoutExtension(source)}.{ObjectFileExtension}: COMPILER {source}");
+            buildCommand.AppendLine($"build {outputFile}: COMPILER {sourcePath}");
             buildCommand.AppendLine($"  DEPFILE = \"{depFile}\"");
             buildCommand.AppendLine($"  DEPFILE_UNQUOTED = {depFile}");
             buildCommand.AppendLine($"  ARGS = {compilerOptions} {cFlags} {includeDirs} {definitions}");
@@ -111,9 +116,14 @@ namespace Buildozer.BuildTool
             return buildCommand.ToString();
         }
 
-        public override string GenerateNinjaCxxCompilationCommand(string source)
+        public override string GenerateNinjaCxxCompilationCommand(string sourcePath)
         {
-            string depFile = $"{Path.GetFileNameWithoutExtension(source)}.{ObjectFileExtension}.d";
+            string depFile = Path.Join(
+                BuildContext.BuildDir,
+                sourcePath.Substring(sourcePath.IndexOf("src")), $"{Path.GetFileNameWithoutExtension(sourcePath)}.{ObjectFileExtension}.d");
+            string outputFile = Path.Join(
+                BuildContext.BuildDir,
+                sourcePath.Substring(sourcePath.IndexOf("src")), $"{Path.GetFileNameWithoutExtension(sourcePath)}.{ObjectFileExtension}");
 
             string compilerOptions = String.Join(" ", CompilerOptions);
             string cxxFlags = String.Join(" ", CXXFlags);
@@ -121,7 +131,7 @@ namespace Buildozer.BuildTool
             string definitions = String.Join(" ", Defines.Select(d => $"/D{d}"));
 
             StringBuilder buildCommand = new StringBuilder();
-            buildCommand.AppendLine($"build {Path.GetFileNameWithoutExtension(source)}.{ObjectFileExtension}: COMPILER {source}");
+            buildCommand.AppendLine($"build {outputFile}: COMPILER {sourcePath}");
             buildCommand.AppendLine($"  DEPFILE = \"{depFile}\"");
             buildCommand.AppendLine($"  DEPFILE_UNQUOTED = {depFile}");
             buildCommand.AppendLine($"  ARGS = {compilerOptions} {cxxFlags} {includeDirs} {definitions}");
@@ -147,7 +157,7 @@ namespace Buildozer.BuildTool
         {
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
-            rule.AppendLine($"  command = \"{Path.Join(BinRoot, CompilerName)}\" $ARGS $CFLAGS $CXXFLAGS /Fo$out /c $in");
+            rule.AppendLine($"  command = \"{Path.Join(BinaryDir, CompilerName)}\" $ARGS $CFLAGS $CXXFLAGS /Fo$out /c $in");
             rule.AppendLine($"  deps = msvc");
             rule.AppendLine($"  description = Compiling C++ object $out");
             return rule.ToString();
@@ -157,7 +167,7 @@ namespace Buildozer.BuildTool
         {
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
-            rule.AppendLine($"  command = \"{Path.Join(BinRoot, LinkerName)}\" $ARGS /OUT:$out $in");
+            rule.AppendLine($"  command = \"{Path.Join(BinaryDir, LinkerName)}\" $ARGS /OUT:$out $in");
             rule.AppendLine($"  description = Linking target $out");
             return rule.ToString();
         }
@@ -166,7 +176,7 @@ namespace Buildozer.BuildTool
         {
             StringBuilder rule = new StringBuilder();
             rule.AppendLine($"rule {name}");
-            rule.AppendLine($"  command = \"{Path.Join(BinRoot, LibrarianName)}\" $ARGS /OUT:$out $in");
+            rule.AppendLine($"  command = \"{Path.Join(BinaryDir, LibrarianName)}\" $ARGS /OUT:$out $in");
             rule.AppendLine($"  description = Archiving target $out");
             return rule.ToString();
         }

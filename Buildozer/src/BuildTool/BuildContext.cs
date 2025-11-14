@@ -56,4 +56,6 @@ public static class BuildContext
     public static bool EnableExceptions = false;
     public static BuildConfig CurrentBuildConfig = BuildConfig.Develop;
     public static BuildWarningLevel CurrentWarningLevel = BuildWarningLevel.W3;
+
+    public static string BuildDir { get; set; } = @"C:/Users/lucac/Desktop/compilation_test/builddir";
 }
