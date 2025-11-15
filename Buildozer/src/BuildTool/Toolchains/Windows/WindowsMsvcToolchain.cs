@@ -5,18 +5,16 @@ using System.Text;
 
 namespace Buildozer.BuildTool
 {
-    public class WindowsMsvcToolchain : MsvcToolchainBase
+    public sealed class WindowsMsvcToolchain : MsvcToolchainBase
     {
-        public Version WinSdkVersion { get; set; }
+        private static readonly string _cCompilationRule = "C_COMPILE";
+        private static readonly string _cxxCompilationRule = "CXX_COMPILE";
+        private static readonly string _linkSharedLibRule = "LINK_SHARED";
+        private static readonly string _linkExecutableRule = "LINK_EXECUTABLE";
 
-        public WindowsMsvcToolchain(
-            OSPlatform toolchainPlatform, 
-            Architecture toolchainArchitecture,
-            Version compilerVersion, 
-            Version winSdkVersion) : base (toolchainPlatform, toolchainArchitecture, compilerVersion) 
+        public WindowsMsvcToolchain(TargetPlatform platform, TargetArchitecture arch) : base (platform, arch) 
         {
             Name = "Windows MSVC";
-            WinSdkVersion = winSdkVersion;
             ExecutableExtension = "exe";
 
             Defines.AddRange([
@@ -24,31 +22,66 @@ namespace Buildozer.BuildTool
                 "_WIN32",
                 "__WINDOWS__",
                 "WINVER=0x0A00",
-                "STOMPER_PLATFORM_WIN32" 
+                "_WIN32_WINNT=0x0A00",
+                "STOMPER_PLATFORM_WIN32"
             ]);
 
             switch (BuildContext.CurrentBuildConfig)
             {
-                case BuildConfig.Debug:
-                case BuildConfig.Develop:
-                    Libraries.AddRange(["vcruntimed.lib","ucrtd.lib"]);
+                case TargetConfiguration.Debug:
+                case TargetConfiguration.Develop:
+                    Libraries.AddRange(["vcruntimed.lib", "ucrtd.lib"]);
                     break;
-                case BuildConfig.Release:
+                case TargetConfiguration.Release:
                     Libraries.AddRange(["vcruntime.lib", "ucrt.lib"]);
                     break;
             }
 
             Libraries.AddRange([
-                "kernel32.lib",
-                "user32.lib", 
-                "shell32.lib", 
-                "ole32.lib", 
-                "oleaut32.lib", 
-                "uuid.lib", 
-                "comdlg32.lib", 
-                "advapi32.lib",
+                "uuid.lib",
                 "gdi32.lib",
+                "ole32.lib",
+                "user32.lib",
+                "shell32.lib",
+                "oleaut32.lib",
+                "kernel32.lib",
+                "comdlg32.lib",
+                "advapi32.lib",
             ]);
+
+            if(BuildArchitecture == TargetArchitecture.Arm64)
+            {
+                Defines.Add("USE_SOFT_INTRINSICS");
+                Libraries.Add("softintrin.lib");
+            }
+        }
+
+        public override void CompileCFiles(NinjaContext ninjaCtx, BuildOptions options, params string[] cxxFiles)
+        {
+            throw new NotImplementedException();
+        }
+        public override void CompileCxxFiles(NinjaContext ninjaCtx, BuildOptions options, params string[] cFile)
+        {
+            throw new NotImplementedException();
+        }
+        
+        public override void LinkExecutable(NinjaContext ninjaCtx, BuildOptions options, string outputName, params string[] objectFiles)
+        {
+            throw new NotImplementedException();
+        }
+        public override void LinkSharedLibrary(NinjaContext ninjaCtx, BuildOptions options, string outputName, params string[] objectFiles)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override void SetupNinjaToolchain(NinjaContext ninjaContext)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override bool Validate(out string? message)
+        {
+            throw new NotImplementedException();
         }
     }
 }

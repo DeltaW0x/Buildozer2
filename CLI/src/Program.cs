@@ -10,6 +10,7 @@ partial class Program
 {
     static void Main()
     {
+        /*
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console()
@@ -19,6 +20,7 @@ partial class Program
         File.WriteAllText(@"C:\Users\lucac\Desktop\compilation_test\build.ninja", toolchains[0].GenerateNinjaToolchain());
         File.AppendAllText(@"C:\Users\lucac\Desktop\compilation_test\build.ninja", toolchains[0].GenerateNinjaCxxCompilationCommand(@"C:/Users/lucac/Desktop/compilation_test/src/main.cpp"));
         File.AppendAllText(@"C:\Users\lucac\Desktop\compilation_test\build.ninja", toolchains[0].GenerateNinjaLinkCommand(false, @"C:/Users/lucac/Desktop/compilation_test/main", [@"C:/Users/lucac/Desktop/compilation_test/builddir/src/main.obj"]));
-    }
+        */
+        }
 }
 
