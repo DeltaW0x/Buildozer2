@@ -38,8 +38,8 @@ namespace Buildozer.BuildTool
         public required string ExecutableExtension { get; init; }
         public required string ObjectFileExtension { get; init; }
 
-        public required string SharedLibImportDefine { get; init; }
-        public required string SharedLibExportDefine { get; init; }
+        public required string SharedLibImportSymbol { get; init; }
+        public required string SharedLibExportSymbol { get; init; }
 
         public required string CdeclCallingDefine { get; init; }
 

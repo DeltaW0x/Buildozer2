@@ -1,12 +1,4 @@
-﻿
-using System;
-using System.Collections.Generic;
-using System.IO.Compression;
-using System.Runtime.InteropServices;
-using System.Security;
-using System.Text;
-
-namespace Buildozer.BuildTool
+﻿namespace Buildozer.BuildTool
 {
     public abstract class MsvcToolchainBase : Toolchain
     {
@@ -20,6 +12,10 @@ namespace Buildozer.BuildTool
             SharedLibExtension = "dll";
             StaticLibExtension = "lib";
             ObjectFileExtension = "obj";
+            SharedLibImportSymbol = "__declspec(dllimport)";
+            SharedLibExportSymbol = "__declspec(dllexport)";
+
+            CdeclCallingDefine = "__cdecl";
 
             CFlags.Add($"/std:{BuildContext.CurrentCVersion switch
             {
@@ -50,18 +46,20 @@ namespace Buildozer.BuildTool
                 Defines.Add("_HAS_EXCEPTIONS=0");
 
             LibrarianOptions.Add("/nologo");
-             
+            
             CompilerOptions.AddRange([
                 "/nologo", 
                 "/showIncludes", 
                 "/utf-8", 
                 "/GS", 
-                "/Zi"]);
+                "/Zi"
+            ]);
             
             LinkerOptions.AddRange([
                 "/nologo", 
                 "/DEBUG", 
-                $"/MACHINE:{(BuildArchitecture == TargetArchitecture.x64? "X64" : "ARM64")}"]);
+                $"/MACHINE:{(BuildArchitecture == TargetArchitecture.x64? "X64" : "ARM64")}"
+            ]);
 
             switch (BuildContext.CurrentBuildConfig)
             {

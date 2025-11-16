@@ -39,7 +39,9 @@ public static class BuildContext
     public static BuildLanguageVersion CurrentCVersion => BuildLanguageVersion.C11;
     public static BuildLanguageVersion CurrentCxxVersion => BuildLanguageVersion.Cxx20;
 
+    public static bool EnableRTTI = false;
     public static bool EnableExceptions = false;
+
     public static BuildWarningLevel CurrentWarningLevel = BuildWarningLevel.W3;
     
     public static TargetPlatform CurrentTargetPlaform;

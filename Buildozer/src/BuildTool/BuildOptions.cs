@@ -12,8 +12,8 @@ namespace Buildozer.BuildTool
         public readonly TargetArchitecture Architecture;
         public readonly TargetConfiguration Configuration;
 
-        public readonly List<string> Sources = new List<string>();
-        public readonly List<string> Outputs = new List<string>();
+        public readonly HashSet<string> Sources = new HashSet<string>();
+        public readonly HashSet<string> Outputs = new HashSet<string>();
 
         public readonly HashSet<string> PublicIncludePaths = new HashSet<string>();
         public readonly HashSet<string> PrivateIncludePaths = new HashSet<string>();
@@ -26,5 +26,10 @@ namespace Buildozer.BuildTool
 
         public readonly HashSet<string> PublicLibraries = new HashSet<string>();
         public readonly HashSet<string> PrivateLibraries = new HashSet<string>();
+
+        public readonly HashSet<string> PublicExternalLibraries = new HashSet<string>();
+        public readonly HashSet<string> PrivateExternalLibraries = new HashSet<string>();
+
+        public readonly HashSet<string> CopyRuntimeDependencies = new HashSet<string>();
     }
 }
