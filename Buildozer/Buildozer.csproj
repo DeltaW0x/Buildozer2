@@ -10,12 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="src\ShaderCompiler\**" />
-    <EmbeddedResource Remove="src\ShaderCompiler\**" />
-    <None Remove="src\ShaderCompiler\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Remove="src\ScriptCache.cs" />
     <Compile Remove="src\ScriptCompiler.cs" />
   </ItemGroup>

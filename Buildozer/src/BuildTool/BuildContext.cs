@@ -14,7 +14,8 @@ public enum BuildLanguage
 {
     C,
     Cxx,
-    Csharp
+    Csharp,
+    Ispc
 }
 
 public enum BuildLanguageVersion
@@ -23,7 +24,7 @@ public enum BuildLanguageVersion
     Cxx17,
     Cxx20,
     Net9,
-    Net10,
+    Net10
 }
 
 public static class BuildContext
@@ -48,5 +49,5 @@ public static class BuildContext
     public static TargetArchitecture CurrrentTargetArch;
     public static TargetConfiguration CurrentBuildConfig = TargetConfiguration.Develop;
 
-    public static string BuildDir { get; set; } = "";
+    public static string BuildDirectory { get; set; } = "";
 }

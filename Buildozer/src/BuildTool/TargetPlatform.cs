@@ -7,8 +7,7 @@ namespace Buildozer.BuildTool
     public enum TargetPlatform
     {
         Window = 0,
-        Linux,
-        LinuxSteamRuntime
+        Linux    
     }
 
     public enum TargetArchitecture
