@@ -14,16 +14,13 @@ public enum BuildLanguage
 {
     C,
     Cxx,
-    Csharp,
-    Ispc
+    Csharp
 }
 
 public enum BuildLanguageVersion
 {
     C11,
-    Cxx17,
     Cxx20,
-    Net9,
     Net10
 }
 

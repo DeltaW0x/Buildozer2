@@ -7,17 +7,9 @@ namespace Buildozer.BuildTool
 {
     public sealed class WindowsMsvcToolchain : MsvcToolchainBase
     {
-        private static readonly string _cCompilationRule = "C_COMPILE";
-        private static readonly string _cxxCompilationRule = "CXX_COMPILE";
-        private static readonly string _linkSharedLibRule = "LINK_SHARED";
-        private static readonly string _linkExecutableRule = "LINK_EXECUTABLE";
-
         public WindowsMsvcToolchain(TargetPlatform platform, TargetArchitecture arch) : base (platform, arch) 
         {
-            Name = "Windows MSVC";
-            ExecutableExtension = "exe";
-
-            Defines.AddRange([
+            GlobalDefines.AddRange([
                 "WIN32",
                 "_WIN32",
                 "__WINDOWS__",
@@ -30,14 +22,14 @@ namespace Buildozer.BuildTool
             {
                 case TargetConfiguration.Debug:
                 case TargetConfiguration.Develop:
-                    Libraries.AddRange(["vcruntimed.lib", "ucrtd.lib"]);
+                    GlobalLibraries.AddRange(["vcruntimed.lib", "ucrtd.lib"]);
                     break;
                 case TargetConfiguration.Release:
-                    Libraries.AddRange(["vcruntime.lib", "ucrt.lib"]);
+                    GlobalLibraries.AddRange(["vcruntime.lib", "ucrt.lib"]);
                     break;
             }
 
-            Libraries.AddRange([
+            GlobalLibraries.AddRange([
                 "uuid.lib",
                 "gdi32.lib",
                 "ole32.lib",
@@ -51,37 +43,9 @@ namespace Buildozer.BuildTool
 
             if(BuildArchitecture == TargetArchitecture.Arm64)
             {
-                Defines.Add("USE_SOFT_INTRINSICS");
-                Libraries.Add("softintrin.lib");
+                GlobalDefines.Add("USE_SOFT_INTRINSICS");
+                GlobalLibraries.Add("softintrin.lib");
             }
-        }
-
-        public override void CompileCFiles(NinjaContext ninjaCtx, BuildOptions options, params string[] cxxFiles)
-        {
-            throw new NotImplementedException();
-        }
-        public override void CompileCxxFiles(NinjaContext ninjaCtx, BuildOptions options, params string[] cFile)
-        {
-            throw new NotImplementedException();
-        }
-        
-        public override void LinkExecutable(NinjaContext ninjaCtx, BuildOptions options, string outputName, params string[] objectFiles)
-        {
-            throw new NotImplementedException();
-        }
-        public override void LinkSharedLibrary(NinjaContext ninjaCtx, BuildOptions options, string outputName, params string[] objectFiles)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override void SetupNinjaToolchain(NinjaContext ninjaContext)
-        {
-            throw new NotImplementedException();
-        }
-
-        public override bool Validate(out string? message)
-        {
-            throw new NotImplementedException();
         }
     }
 }

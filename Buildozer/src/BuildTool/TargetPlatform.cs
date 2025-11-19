@@ -14,7 +14,6 @@ namespace Buildozer.BuildTool
     {
         x64 = 0,
         Arm64,
-        Universal
     }
 
     public enum TargetConfiguration
